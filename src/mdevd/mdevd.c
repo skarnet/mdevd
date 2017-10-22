@@ -918,7 +918,10 @@ int main (int argc, char const *const *argv)
       }
     }
     argc -= l.ind ; argv += l.ind ;
-    if (configfile[0] != '/') strerr_dief1x(100, "conffile must be an absolute path") ;
+    if (configfile[0] != '/') strerr_dief2x(100, configfile, " is not an absolute path") ;
+    if (slashsys[0] != '/') strerr_dief2x(100, slashsys, " is not an absolute path") ;
+    if (slashdev[0] != '/') strerr_dief2x(100, slashdev, " is not an absolute path") ;
+    if (fwbase[0] != '/') strerr_dief2x(100, fwbase, " is not an absolute path") ;
     if (chdir(slashdev) < 0) strerr_diefu2sys(111, "chdir to ", slashdev) ;
   }
 

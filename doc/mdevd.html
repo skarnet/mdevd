@@ -90,13 +90,17 @@ is seriously verbose debugging. </li>
 device nodes, and it will not spawn commands. Instead, it will print to stdout
 the commands it would have spawned. </li>
  <li> <tt>-f</tt>&nbsp;<em>conffile</em>&nbsp;: read the configuration
-file from <em>conffile</em>. Default is <tt>/etc/mdev.conf</tt>. </li>
+file from <em>conffile</em>. Default is <tt>/etc/mdev.conf</tt>.
+<em>conffile</em> must be an absolute path. </li>
  <li> <tt>-s</tt>&nbsp;<em>slashsys</em>&nbsp;: assume the sysfs
-pseudo-filesystem is mounted on <em>slashsys</em>. Default is <tt>/sys</tt>. </li>
+pseudo-filesystem is mounted on <em>slashsys</em>. Default is <tt>/sys</tt>.
+<em>slashsys</em> must be an absolute path. </li>
  <li> <tt>-d</tt>&nbsp;<em>slashdev</em>&nbsp;: assume the device nodes
-are to be found in  <em>slashdev</em>. Default is <tt>/dev</tt>. </li>
+are to be found in  <em>slashdev</em>. Default is <tt>/dev</tt>.
+<em>slashdev</em> must be an absolute path. </li>
  <li> <tt>-F</tt>&nbsp;<em>fwbase</em>&nbsp;: assume the firmware files, if any,
-are to be found in  <em>fwbase</em>. Default is <tt>/lib/firmware</tt>. </li>
+are to be found in  <em>fwbase</em>. Default is <tt>/lib/firmware</tt>.
+<em>fwbase</em> must be an absolute path. </li>
 </ul>
 
 <h2> Configuration file </h2>
