@@ -3,6 +3,6 @@
 *.lo
 *.so
 *.so.*
-mdevd
-mdevd-netlink
-mdevd-coldplug
+/mdevd
+/mdevd-netlink
+/mdevd-coldplug
