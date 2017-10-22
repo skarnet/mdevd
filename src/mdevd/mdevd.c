@@ -191,27 +191,33 @@ static inline void script_firstpass (char *s, unsigned short *scriptlen, unsigne
 {
   static unsigned char const table[5][9] =
   {
-    { 0x05, 0x00, 0x06, 0x34, 0x04, 0x01, 0x24, 0x00, 0x22 },
+    { 0x05, 0x00, 0x06, 0x34, 0x04, 0x01, 0x24, 0x40, 0x22 },
     { 0x06, 0x06, 0x06, 0x34, 0x06, 0x06, 0x24, 0x06, 0x22 },
     { 0x06, 0x04, 0x13, 0x02, 0x06, 0x02, 0x02, 0x06, 0x02 },
     { 0x06, 0x06, 0x06, 0x02, 0x06, 0x02, 0x02, 0x06, 0x02 },
-    { 0x05, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x00, 0x04 }
+    { 0x05, 0x04, 0x04, 0x04, 0x04, 0x04, 0x04, 0x40, 0x04 }
   } ;
   size_t i = 0 ;
+  size_t col0 = 0 ;
+  unsigned int line = 1 ;
   unsigned short n = 0, m = 0 ;
   unsigned int state = 0 ;
   while (state < 5)
   {
-    unsigned char what = table[state][firstpass_cclass(s[i++])] ;
+    unsigned char what = table[state][firstpass_cclass(s[i])] ;
     state = what & 0x07 ;
     if (what & 0x10) m++ ;
     if (what & 0x20) n++ ;
+    if (what & 0x40) { line++ ; col0 = i ; }
+    i++ ;
   }
   if (state == 6)
   {
-    s[--i] = 0 ;
-    while (i && !strchr(" \n\r\t", s[i])) i-- ;
-    strerr_dief2x(2, "syntax error during first pass, after string: ", (char *)s + i) ;
+    char fmtline[UINT_FMT] ;
+    char fmtcol[UINT_FMT] ;
+    fmtline[uint_fmt(fmtline, line)] = 0 ;
+    fmtcol[uint_fmt(fmtcol, i - col0)] = 0 ;
+    strerr_dief6x(2, "syntax error during ", "first", " pass: line ", fmtline, " column ", fmtcol) ;
   }
 
   *scriptlen = n ;
@@ -295,7 +301,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         regerror(r, &envmatch[j].re, errbuf, 256) ;
-        strerr_dief8x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to compile regular expression ", "for envmatch: ", s + mark, ": ", errbuf) ;
+        strerr_diefu6x(2, "compile regular expression ", s + mark, " for envmatch at line ", fmtline, ": ", errbuf) ;
       }
       j++ ;
       script[i].envmatchlen++ ;
@@ -306,7 +312,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       {
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
-        strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan major from string: ", s + mark) ;
+        strerr_diefu4x(2, "get major from string ", s + mark, " at line ", fmtline) ;
       }
     }
     if (what & 0x00400000)
@@ -315,7 +321,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       {
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
-        strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan minor from string: ", s + mark) ;
+        strerr_diefu4x(2, "get minor from string ", s + mark, " at line ", fmtline) ;
       }
     }
     if (what & 0x00200000) script[i].devmatch.majmin.minhi = script[i].devmatch.majmin.minlo ;
@@ -325,7 +331,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       {
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
-        strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan minor from string: ", s + mark) ;
+        strerr_diefu4x(2, "get minor from string ", s + mark, " at line ", fmtline) ;
       }
     }
     if (what & 0x00080000)
@@ -337,7 +343,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         regerror(r, &envmatch[j].re, errbuf, 256) ;
-        strerr_dief8x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to compile regular expression ", " for devmatch: ", s + mark, ": ", errbuf) ;
+        strerr_diefu6x(2, "compile regular expression ", s + mark, " for devmatch at line ", fmtline, ": ", errbuf) ;
       }
     }
     if (what & 0x00040000) envmatch[j].var = mark ;
@@ -349,7 +355,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       {
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
-        strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to get uid from string: ", s + mark) ;
+        strerr_diefu4x(2, "get uid from string ", s + mark, " at line ", fmtline) ;
       }
     }
     if (what & 0x00010000)
@@ -360,7 +366,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       {
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
-        strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to get gid from string: ", s + mark) ;
+        strerr_diefu4x(2, "get gid from string ", s + mark, " at line ", fmtline) ;
       }
     }
     if (what & 0x00008000)
@@ -370,7 +376,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       {
         char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
-        strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan mode from string: ", s + mark) ;
+        strerr_diefu4x(2, "get mode from string ", s + mark, " at line ", fmtline) ;
       }
       script[i].mode = m ;
     }
@@ -392,7 +398,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
     char fmtcol[UINT_FMT] ;
     fmtline[uint_fmt(fmtline, line)] = 0 ;
     fmtcol[uint_fmt(fmtcol, pos - col0)] = 0 ;
-    strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, " column ", fmtcol) ;
+    strerr_dief6x(2, "syntax error during ", "second", " pass: line ", fmtline, " column ", fmtcol) ;
   }
 }
 

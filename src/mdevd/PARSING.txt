@@ -6,7 +6,7 @@
 class	|	0	1	2	3	4	5	6	7	8
 st\ev	|	\0	space	;	$	#	-	@	\n	other
 
-START	|				env+ele			ele		ele
+START	|				env+ele			ele	+	ele
 00	|	END	START	X	ENDLINE	ENDLINE	MINUS	ENDLINE	START	DEVVAR
 
 MINUS	|				env+ele			ele		ele
@@ -18,12 +18,12 @@ DEVVAR	|			env
 SEMI	|
 03	|	X	X	X	DEVVAR	X	DEVVAR	DEVVAR	X	DEVVAR
 
-ENDLINE	|
+ENDLINE	|								+
 04	|	END	ENDLINE	ENDLINE	ENDLINE	ENDLINE	ENDLINE	ENDLINE	START	ENDLINE
 
  END = 05, X = 06
  States -> 0x00 to 0x06
- Actions -> 0x10 (add an envmatch) and 0x20 (add a scriptelem)
+ Actions -> 0x10 (add an envmatch), 0x20 (add a scriptelem), 0x40 (line++)
  Everything fits easily in an unsigned char.
 
 
