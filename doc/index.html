@@ -1,0 +1,115 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="Content-Language" content="en" />
+    <title>mdevd - A mdev-compatible Linux hotplug manager daemon</title>
+    <meta name="Description" content="mdevd - a mdev-compatible Linux hotplug manager daemon" />
+    <meta name="Keywords" content="mdevd mdev udevd udev Linux kernel hotplug event uevent administration root laurent bercot ska skarnet" />
+    <!-- <link rel="stylesheet" type="text/css" href="//skarnet.org/default.css" /> -->
+  </head>
+<body>
+
+<p>
+<a href="//skarnet.org/software/">Software</a><br />
+<a href="//skarnet.org/">skarnet.org</a>
+</p>
+
+<h1> mdevd </h1>
+
+<h2> What is it&nbsp;? </h2>
+
+<p>
+ mdevd is a small daemon managing kernel hotplug events, similarly to udevd.
+</p>
+
+<p>
+ It uses the same configuration file as
+<a href="https://git.busybox.net/busybox/plain/docs/mdev.txt">mdev</a>,
+which is a hotplug manager integrated in the
+<a href="https://busybox.net/">Busybox</a> suite of tools.
+However, mdev needs to be registered in
+<tt>/proc/sys/kernel/hotplug</tt>, and the kernel forks
+an instance of mdev for every event; by contrast, mdevd is a daemon
+and does not fork.
+</p>
+
+<p>
+ The point of mdevd is to provide a drop-in replacement to mdev
+that does not fork, so it can handle large influxes of events
+at boot time without a performance drop. mdevd is designed to be
+entirely compatible with advanced mdev usage such as
+<a href="https://github.com/slashbeast/mdev-like-a-boss">mdev-like-a-boss</a>.
+</p>
+
+<hr />
+
+<h2> Installation </h2>
+
+<h3> Requirements </h3>
+
+<ul>
+ <li> A Linux-based system with a standard C development environment.
+The Linux kernel must be 2.6.10 or later. </li>
+ <li> GNU make, version 3.81 or later </li>
+ <li> <a href="//skarnet.org/software/skalibs/">skalibs</a> version
+2.6.0.0 or later. It's a build-time requirement. It's also a run-time
+requirement if you link against the shared version of the skalibs
+library. </li>
+</ul>
+
+<h3> Licensing </h3>
+
+<p>
+ mdevd is free software. It is available under the
+<a href="http://opensource.org/licenses/ISC">ISC license</a>.
+</p>
+
+<h3> Download </h3>
+
+<ul>
+ <li> The current released version of mdevd is
+<a href="mdevd-0.0.1.0.tar.gz">0.0.1.0</a>. </li>
+ <li> Alternatively, you can checkout a copy of the
+<a href="//git.skarnet.org/cgi-bin/cgit.cgi/mdevd/">mdevd
+git repository</a>:
+<pre> git clone git://git.skarnet.org/mdevd </pre> </li>
+ <li> There's also a
+<a href="https://github.com/skarnet/mdevd">GitHub mirror</a>
+of the mdevd git repository. </li>
+</ul>
+
+<h3> Compilation </h3>
+
+<ul>
+ <li> See the enclosed INSTALL file for installation details. </li>
+</ul>
+
+<h3> Upgrade notes </h3>
+
+<ul>
+ <li> <a href="upgrade.html">This page</a> lists the differences to be aware of between
+the previous versions of mdevd and the current one. </li>
+</ul>
+
+<hr />
+
+<h2> Reference </h2>
+
+<h3> Commands </h3>
+
+<ul>
+<li><a href="mdevd.html">The <tt>mdevd</tt> program</a></li>
+<li><a href="mdevd-netlink.html">The <tt>mdevd-netlink</tt> program</a></li>
+<li><a href="mdevd-coldplug.html">The <tt>mdevd-coldplug</tt> program</a></li>
+</ul>
+
+<h2> Related resources </h2>
+
+<ul>
+ <li> <tt>mdevd</tt> is discussed on the
+<a href="//skarnet.org/lists.html#skaware">skaware</a> mailing-list. </li>
+</ul>
+
+</body>
+</html>

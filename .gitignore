@@ -1,0 +1,8 @@
+*.o
+*.a
+*.lo
+*.so
+*.so.*
+mdevd
+mdevd-netlink
+mdevd-coldplug

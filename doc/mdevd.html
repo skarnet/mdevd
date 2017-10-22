@@ -1,0 +1,130 @@
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+    <meta http-equiv="Content-Language" content="en" />
+    <title>mdevd: the mdevd program</title>
+    <meta name="Description" content="mdevd: the mdevd program" />
+    <meta name="Keywords" content="mdevd linux administration root utilities devd mdev uevent netlink hotplug manager" />
+    <!-- <link rel="stylesheet" type="text/css" href="//skarnet.org/default.css" /> -->
+  </head>
+<body>
+
+<p>
+<a href="index.html">mdevd</a><br />
+<a href="//skarnet.org/software/">Software</a><br />
+<a href="//skarnet.org/">skarnet.org</a>
+</p>
+
+<h1> The <tt>mdevd</tt> program </h1>
+
+<p>
+<tt>mdevd</tt> is an uevent manager. It reads a series of
+uevents on its stdin; for every uevent it reads, it performs
+actions according to its configuration file. Actions can
+be inserting a kernel module, creating or modifying device
+entries in <tt>/dev</tt>, etc.
+</p>
+
+<p>
+ <tt>mdevd</tt>'s configuration file uses the exact same
+format as
+<a href="https://git.busybox.net/busybox/plain/docs/mdev.txt">mdev</a>.
+The differences between mdevd and mdev are:
+</p>
+
+<ul>
+ <li> mdev needs to be registered as a hotplug manager and the
+kernel spawns an instance of mdev per uevent; for every uevent,
+mdev has to parse its configuration file. By contrast, there
+is only one instance of mdevd, reading a series of uevents and
+performing actions without forking; the configuration file is
+read and parsed only once. </li>
+ <li> mdevd reads uevents on its stdin. It is not suitable as
+a hotplug manager, and it does not connect to the netlink itself
+either. It is meant to be used in conjunction with
+<a href="mdevd-netlink.html">mdevd-netlink</a>, which reads
+uevents from the netlink, or with
+<a href="mdevd-coldplug.html">mdevd-coldplug</a>, which generates
+coldplug uevents. </li>
+</ul>
+
+<h2> Interface </h2>
+
+<pre>
+     mdevd [ -v <em>verbosity</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ]
+</pre>
+
+<ul>
+ <li> mdevd reads and parses its configuration file <tt>/etc/mdev.conf</tt>. </li>
+ <li> It then reads its stdin, waiting for uevents.
+ <li> It exits when it has finished scanning. </li>
+</ul>
+
+<h2> Exit codes </h2>
+
+<ul>
+ <li> 0: EOF read on mdevd's stdin </li>
+ <li> 1: received an invalid event </li>
+ <li> 100: wrong usage </li>
+ <li> 111: system call failed </li>
+</ul>
+
+<h2> Signals </h2>
+
+<p>
+ mdevd reacts to the following signals:
+</p>
+
+<ul>
+ <li> SIGHUP: re-read the configuration file </li>
+</ul>
+
+<h2> Options </h2>
+
+<ul>
+ <li> <tt>-v</tt>&nbsp;<em>verbosity</em>&nbsp;: be more or less verbose.
+Default verbosity is 1. 0 will only print fatal error messages, 3 or more
+is seriously verbose debugging. </li>
+ <li> <tt>-n</tt>&nbsp;: dry run. mdevd will not create or delete
+device nodes, and it will not spawn commands. Instead, it will print to stdout
+the commands it would have spawned. </li>
+ <li> <tt>-f</tt>&nbsp;<em>conffile</em>&nbsp;: read the configuration
+file from <em>conffile</em>. Default is <tt>/etc/mdev.conf</tt>. </li>
+ <li> <tt>-s</tt>&nbsp;<em>slashsys</em>&nbsp;: assume the sysfs
+pseudo-filesystem is mounted on <em>slashsys</em>. Default is <tt>/sys</tt>. </li>
+ <li> <tt>-d</tt>&nbsp;<em>slashdev</em>&nbsp;: assume the device nodes
+are to be found in  <em>slashdev</em>. Default is <tt>/dev</tt>. </li>
+ <li> <tt>-F</tt>&nbsp;<em>fwbase</em>&nbsp;: assume the firmware files, if any,
+are to be found in  <em>fwbase</em>. Default is <tt>/lib/firmware</tt>. </li>
+</ul>
+
+<h2> Configuration file </h2>
+
+<p>
+ mdevd uses mdev's configuration file format.
+A good <tt>mdev.conf</tt> example is available
+<a href="https://github.com/slashbeast/mdev-like-a-boss/blob/master/mdev.conf">here.</a>
+</p>
+
+<p>
+ If mdevd cannot find its configuration file, it will use a simple, basic default
+configuration where it can create device nodes as root or delete them, and does
+nothing else.
+</p>
+
+<h2> Notes </h2>
+
+<ul>
+ <li> Strictly speaking, mdevd is a short-lived program: it has
+a normal exit condition, which is when it receives EOF on its stdin.
+That allows it to work as a coldplug manager when paired with
+<a href="mdevd-coldplug.html">mdevd-coldplug</a>. </li>
+ <li> However, when paired with <a href="mdevd-netlink.html">mdevd-netlink</a>,
+it acts as a daemon, because mdev-netlink normally never exits until
+the end of the machine lifetime and never closes its stdout, so
+mdevd's stdin never receives EOF. </li>
+</ul>
+
+</body>
+</html>
