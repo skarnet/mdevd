@@ -391,7 +391,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
     char fmtline[UINT_FMT] ;
     char fmtcol[UINT_FMT] ;
     fmtline[uint_fmt(fmtline, line)] = 0 ;
-    fmtcol[uint_fmt(fmtcol, pos - col0 - 1)] = 0 ;
+    fmtcol[uint_fmt(fmtcol, pos - col0)] = 0 ;
     strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, " column ", fmtcol) ;
   }
 }
@@ -407,6 +407,7 @@ static inline int wait_for_loading (char const *sysdevpath, size_t sysdevpathlen
   char loadingfn[sysdevpathlen + 9] ;
   memcpy(loadingfn, sysdevpath, sysdevpathlen) ;
   memcpy(loadingfn + sysdevpathlen, "/loading", 9) ;
+  tain_now_g() ;
   while (n--)  /* sysfs doesn't support inotify, so we have to poll -_- */
   {
     tain_t deadline ;
@@ -960,7 +961,7 @@ int main (int argc, char const *const *argv)
     if (len < 0)
     {
       if (errno != ENOENT) strerr_diefu2sys(111, "read ", configfile) ;
-      strerr_warnwu2sys("read ", configfile) ;
+      if (verbosity) strerr_warnwu2sys("read ", configfile) ;
       len = 0 ;
     }
     buf[len++] = 0 ;
@@ -976,10 +977,9 @@ int main (int argc, char const *const *argv)
       script_secondpass(buf, script, envmatch) ;
       while (cont || pid)
       {
-        static tain_t const deadline = TAIN_INFINITE ;
         if (buffer_len(buffer_0)) handle_stdin(&event, script, scriptlen, buf, envmatch, &w) ;
         x[1].events = pid ? 0 : IOPAUSE_READ ;
-        if (iopause_g(x, 1 + cont, &deadline) < 0) strerr_diefu1sys(111, "iopause") ;
+        if (iopause(x, 1 + cont, 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ && handle_signals()) break ;
         if (cont && !pid && x[1].revents & IOPAUSE_READ)
           handle_stdin(&event, script, scriptlen, buf, envmatch, &w) ;
