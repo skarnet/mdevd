@@ -294,7 +294,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       if (r)
       {
         char errbuf[256] ;
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         regerror(r, &envmatch[j].re, errbuf, 256) ;
         strerr_dief8x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to compile regular expression ", "for envmatch: ", s + mark, ": ", errbuf) ;
@@ -306,7 +306,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
     {
       if (!uint0_scan(s + mark, &script[i].devmatch.majmin.maj))
       {
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan major from string: ", s + mark) ;
       }
@@ -315,7 +315,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
     {
       if (!uint0_scan(s + mark, &script[i].devmatch.majmin.minlo))
       {
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan minor from string: ", s + mark) ;
       }
@@ -325,7 +325,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
     {
       if (!uint0_scan(s + mark, &script[i].devmatch.majmin.minhi))
       {
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan minor from string: ", s + mark) ;
       }
@@ -336,7 +336,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       if (r)
       {
         char errbuf[256] ;
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         regerror(r, &envmatch[j].re, errbuf, 256) ;
         strerr_dief8x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to compile regular expression ", " for devmatch: ", s + mark, ": ", errbuf) ;
@@ -349,7 +349,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       if (pw) script[i].uid = pw->pw_uid ;
       else if (!uid0_scan(s + mark, &script[i].uid))
       {
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to get uid from string: ", s + mark) ;
       }
@@ -360,7 +360,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       if (gr) script[i].gid = gr->gr_gid ;
       else if (!gid0_scan(s + mark, &script[i].gid))
       {
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to get gid from string: ", s + mark) ;
       }
@@ -370,7 +370,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
       unsigned int m ;
       if (!uint0_oscan(s + mark, &m))
       {
-        char fmtline[UINT_MAX] ;
+        char fmtline[UINT_FMT] ;
         fmtline[uint_fmt(fmtline, line)] = 0 ;
         strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, ": unable to scan mode from string: ", s + mark) ;
       }
@@ -390,8 +390,8 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
 
   if (state == 0x1f)
   {
-    char fmtline[UINT_MAX] ;
-    char fmtcol[UINT_MAX] ;
+    char fmtline[UINT_FMT] ;
+    char fmtcol[UINT_FMT] ;
     fmtline[uint_fmt(fmtline, line)] = 0 ;
     fmtcol[uint_fmt(fmtcol, pos - col0 - 1)] = 0 ;
     strerr_dief5x(2, "syntax error during second pass: ", "line ", fmtline, " column ", fmtcol) ;
