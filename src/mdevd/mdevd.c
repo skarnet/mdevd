@@ -160,7 +160,7 @@ static inline int mkdirp (char *s)
       if (dryrun) strerr_warni2x("dry run: mkdir ", s) ;
       else r = mkdir(s, 0755) ;
       s[i] = '/' ;
-      if (r < 0) break ;
+      if (r < 0 && errno != EEXIST) break ;
     }
   }
   return i >= n ;
