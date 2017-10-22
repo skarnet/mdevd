@@ -31,7 +31,6 @@
 #include <skalibs/skamisc.h>
 #include <skalibs/surf.h>
 #include <skalibs/random.h>
-#include <skalibs/lolstdio.h>
 #include "mdevd.h"
 
 #define USAGE "mdevd [ -v verbosity ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
@@ -269,7 +268,6 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
   uint32_t state = 0 ;
   unsigned short i = 0 ; /* current scriptelem index */
   unsigned short j = 0 ; /* current envmatch index */
-  LOLDEBUG("in script_secondpass") ;
   while (state < 0x1e)
   {
     uint32_t what = table[state][secondpass_cclass(s[pos])] ;
@@ -972,7 +970,6 @@ int main (int argc, char const *const *argv)
       scriptelem script[scriptlen + 1] ;
       memset(script, 0, scriptlen * sizeof(scriptelem)) ;
       script[scriptlen++] = scriptelem_catchall ;
-      LOLDEBUG("before script_secondpass: len: %lld  scriptlen: %hu  envmatchlen: %hu  sizeof(scriptelem): %llu", len, scriptlen, envmatchlen, sizeof(scriptelem)) ;
       script_secondpass(buf, script, envmatch) ;
       while (cont || pid)
       {
