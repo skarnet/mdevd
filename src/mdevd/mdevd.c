@@ -264,7 +264,7 @@ static inline void script_secondpass (char *s, scriptelem *script, struct envmat
   size_t mark = 0 ;
   size_t col0 = 0 ;
   size_t pos = 0 ;
-  unsigned int line = 0 ;
+  unsigned int line = 1 ;
   uint32_t state = 0 ;
   unsigned short i = 0 ; /* current scriptelem index */
   unsigned short j = 0 ; /* current envmatch index */
