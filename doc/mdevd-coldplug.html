@@ -20,7 +20,7 @@
 
 <p>
 <tt>mdevd-coldplug</tt> performs a <em>coldplug</em>: it scans
-<tt>/sys</tt> for all registered devices an uevent manager would
+<tt>/sys</tt> for all registered devices a uevent manager would
 want to perform actions on, and generates uevents for all these
 devices.
 </p>
@@ -33,7 +33,7 @@ devices.
 
 <ul>
  <li> mdevd-coldplug scans <tt>/sys</tt> for devices. </li>
- <li> For every suitable device it finds, it generates an
+ <li> For every suitable device it finds, it generates a
 uevent and writes it to its stdout, using the same format
 as <a href="mdevd-netlink.html">mdevd-netlink</a>. </li>
  <li> It exits when it has finished scanning. </li>
