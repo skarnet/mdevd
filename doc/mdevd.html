@@ -58,7 +58,7 @@ coldplug uevents. </li>
 <ul>
  <li> mdevd reads and parses its configuration file <tt>/etc/mdev.conf</tt>. </li>
  <li> It then reads its stdin, waiting for uevents.
- <li> It exits when it has finished scanning. </li>
+ <li> It exits when the stream of uevents ends. (EOF on stdin.) </li>
 </ul>
 
 <h2> Exit codes </h2>
@@ -89,7 +89,7 @@ Default verbosity is 1. 0 will only print fatal error messages, 3 or more
 is seriously verbose debugging. </li>
  <li> <tt>-n</tt>&nbsp;: dry run. mdevd will not create or delete
 device nodes, and it will not spawn commands. Instead, it will print to stdout
-the commands it would have spawned. </li>
+the actions it would have performed. </li>
  <li> <tt>-f</tt>&nbsp;<em>conffile</em>&nbsp;: read the configuration
 file from <em>conffile</em>. Default is <tt>/etc/mdev.conf</tt>.
 <em>conffile</em> must be an absolute path. </li>
