@@ -957,7 +957,7 @@ int main (int argc, char const *const *argv)
   mdevd_random_init() ;
   umask(0) ;
 
-  while (cont || pid)
+  while (cont)
   {
     ssize_t len ;
     unsigned short scriptlen = 0 ;
@@ -975,23 +975,25 @@ int main (int argc, char const *const *argv)
 
     {
       size_t w = 0 ;
+      int reload = 0 ;
       struct uevent_s event = UEVENT_ZERO ;
       struct envmatch_s envmatch[envmatchlen ? envmatchlen : 1] ;
       scriptelem script[scriptlen + 1] ;
       memset(script, 0, scriptlen * sizeof(scriptelem)) ;
       script[scriptlen++] = scriptelem_catchall ;
       script_secondpass(buf, script, envmatch) ;
-      while (cont || pid)
+      while (pid || (cont && (!reload || buffer_len(buffer_0))))
       {
         if (buffer_len(buffer_0)) handle_stdin(&event, script, scriptlen, buf, envmatch, &w) ;
         x[1].events = pid ? 0 : IOPAUSE_READ ;
         if (iopause(x, 1 + cont, 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
-        if (x[0].revents & IOPAUSE_READ && handle_signals()) break ;
+        if (x[0].revents & IOPAUSE_READ && handle_signals()) reload = 1 ;
         if (cont && !pid && x[1].revents & IOPAUSE_READ)
           handle_stdin(&event, script, scriptlen, buf, envmatch, &w) ;
       }
       script_free(script, scriptlen, envmatch, envmatchlen) ;
     }
-  } 
+  }
+  ndelay_off(0) ;
   return 0 ;
 }
