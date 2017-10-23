@@ -64,8 +64,9 @@ coldplug uevents. </li>
 <h2> Exit codes </h2>
 
 <ul>
- <li> 0: EOF read on mdevd's stdin </li>
+ <li> 0: EOF read on standard input </li>
  <li> 1: received an invalid event </li>
+ <li> 2: syntax error in the configuration file </li>
  <li> 100: wrong usage </li>
  <li> 111: system call failed </li>
 </ul>
@@ -128,6 +129,8 @@ That allows it to work as a coldplug manager when paired with
 it acts as a daemon, because mdev-netlink normally never exits until
 the end of the machine lifetime and never closes its stdout, so
 mdevd's stdin never receives EOF. </li>
+ <li> The <tt>examples/</tt> subdirectory of the mdevd package contains
+examples on how to run mdevd under various init systems / supervisors. </li>
 </ul>
 
 </body>
