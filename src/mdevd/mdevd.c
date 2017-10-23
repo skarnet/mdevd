@@ -133,7 +133,7 @@ static inline void script_free (scriptelem *script, unsigned short scriptlen, st
   for (i = 0 ; i < envmatchlen ; i++) regfree(&envmatch[i].re) ;
 }
 
-static void mdevd_random_init (void)
+static inline void mdevd_random_init (void)
 {
   char seed[160] ;
   random_makeseed(seed) ;
@@ -514,7 +514,7 @@ static inline unsigned char format_cclass (char c)
   return (unsigned char)c < 58 ? classtable[(unsigned char)c] - '0' : 3 ;
 }
 
-static ssize_t alias_format (char *out, size_t outmax, char const *in, char const *data, regmatch_t const *off)
+static inline ssize_t alias_format (char *out, size_t outmax, char const *in, char const *data, regmatch_t const *off)
 {
   static unsigned char const table[2][4] = { { 0x12, 0x01, 0x10, 0x10 }, { 0x03, 0x10, 0x20, 0x03 } } ;
   size_t w = 0 ;
