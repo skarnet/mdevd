@@ -1032,7 +1032,6 @@ int main (int argc, char const *const *argv)
 
   x[1].fd = netlink_init(kbufsz) ;
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
-
   x[0].fd = selfpipe_init() ;
   if (x[0].fd < 0) strerr_diefu1sys(111, "init selfpipe") ;
   if (sig_ignore(SIGPIPE) < 0) strerr_diefu1sys(111, "ignore SIGPIPE") ;
@@ -1047,12 +1046,6 @@ int main (int argc, char const *const *argv)
   }
   mdevd_random_init() ;
   umask(0) ;
-
-  if (notif)
-  {
-    fd_write(notif, "\n", 1) ;
-    fd_close(notif) ;
-  }
 
   while (cont)
   {
@@ -1077,6 +1070,12 @@ int main (int argc, char const *const *argv)
       script[scriptlen++] = scriptelem_catchall ;
       script_secondpass(storage, script, envmatch) ;
       cont = 2 ;
+      if (notif)
+      {
+        fd_write(notif, "\n", 1) ;
+        fd_close(notif) ;
+        notif = 0 ;
+      }
 
       while (pid || cont == 2)
       {
