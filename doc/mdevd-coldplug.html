@@ -21,8 +21,8 @@
 <p>
 <tt>mdevd-coldplug</tt> performs a <em>coldplug</em>: it scans
 <tt>/sys</tt> for all registered devices a uevent manager would
-want to perform actions on, and generates uevents for all these
-devices.
+want to perform actions on, and tells the kernel to generate uevents
+for all these devices.
 </p>
 
 <h2> Interface </h2>
@@ -33,16 +33,12 @@ devices.
 
 <ul>
  <li> mdevd-coldplug scans <tt>/sys</tt> for devices. </li>
- <li> For every suitable device it finds, it generates a
-uevent and writes it to its stdout, using the same format
-as <a href="mdevd-netlink.html">mdevd-netlink</a>. </li>
- <li> It exits when it has finished scanning. </li>
+ <li> For every suitable device it finds, it tells the kernel
+to generate an event. If a device manager such as
+as <a href="mdevd.html">mdevd</a> is listening to the netlink
+at this point, it will pick up the series of events. </li>
+ <li> mdevd-coldplug exits when it has finished scanning. </li>
 </ul>
-
-<p>
- This implies that the <tt>mdevd-coldplug | mdevd</tt> command line
-will function as a coldplug manager, just like <tt>mdev -s</tt>.
-</p>
 
 <h2> Options </h2>
 
@@ -62,12 +58,7 @@ pseudo-filesystem is mounted on <em>slashsys</em>. Default is <tt>/sys</tt>. </l
 
 <ul>
  <li> mdevd-coldplug is a short-lived program, just like
-<tt>mdev -s</tt>. </li>
- <li> Unlike <tt>mdev -s</tt>, however, mdevd-coldplug does
-not act on the uevents it generates. It simply prints them.
-This allows for easy debugging. </li>
- <li> To act on the uevents, simply pipe the output of
-<tt>mdevd-coldplug</tt> into <a href="mdevd.html">mdevd</a>. </li>
+<tt>mdev -s</tt> or <tt>udevadm trigger</tt>. </li>
 </ul>
 
 </body>

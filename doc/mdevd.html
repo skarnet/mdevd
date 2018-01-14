@@ -19,8 +19,8 @@
 <h1> The <tt>mdevd</tt> program </h1>
 
 <p>
-<tt>mdevd</tt> is a uevent manager. It reads a series of
-uevents on its stdin; for every uevent it reads, it performs
+<tt>mdevd</tt> is a uevent manager. It connects to the netlink and reads
+a series of uevents; for every uevent it reads, it performs
 actions according to its configuration file. Actions can
 be inserting a kernel module, creating or modifying device
 entries in <tt>/dev</tt>, etc.
@@ -36,35 +36,29 @@ The differences between mdevd and mdev are:
 <ul>
  <li> mdev needs to be registered as a hotplug manager and the
 kernel spawns an instance of mdev per uevent; for every uevent,
-mdev has to parse its configuration file. By contrast, there
-is only one instance of mdevd, reading a series of uevents and
+mdev has to parse its configuration file. By contrast, mdevd is
+a daemon: it's long-lived, and there is only one instance,
+reading a series of uevents and
 performing actions without forking; the configuration file is
 read and parsed only once. </li>
- <li> mdevd reads uevents on its stdin. It is not suitable as
-a hotplug manager, and it does not connect to the netlink itself
-either. It is meant to be used in conjunction with
-<a href="mdevd-netlink.html">mdevd-netlink</a>, which reads
-uevents from the netlink, or with
-<a href="mdevd-coldplug.html">mdevd-coldplug</a>, which generates
-coldplug uevents. </li>
 </ul>
 
 <h2> Interface </h2>
 
 <pre>
-     mdevd [ -v <em>verbosity</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ]
+     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ]
 </pre>
 
 <ul>
  <li> mdevd reads and parses its configuration file <tt>/etc/mdev.conf</tt>. </li>
- <li> It then reads its stdin, waiting for uevents.
- <li> It exits when the stream of uevents ends. (EOF on stdin.) </li>
+ <li> It then connects to the netlink and reads from it, waiting for uevents.
+ <li> It exits 0 on a SIGTERM. </li>
 </ul>
 
 <h2> Exit codes </h2>
 
 <ul>
- <li> 0: EOF read on standard input </li>
+ <li> 0: SIGTERM received, clean exit </li>
  <li> 1: received an invalid event </li>
  <li> 2: syntax error in the configuration file </li>
  <li> 100: wrong usage </li>
@@ -79,6 +73,7 @@ coldplug uevents. </li>
 
 <ul>
  <li> SIGHUP: re-read the configuration file </li>
+ <li> SIGTERM: exit as soon as possible </li>
 </ul>
 
 <h2> Options </h2>
@@ -87,6 +82,17 @@ coldplug uevents. </li>
  <li> <tt>-v</tt>&nbsp;<em>verbosity</em>&nbsp;: be more or less verbose.
 Default verbosity is 1. 0 will only print fatal error messages, 3 or more
 is seriously verbose debugging. </li>
+ <li> <tt>-D</tt>&nbsp;<em>notif</em>&nbsp;: when ready
+(actually listening to the netlink),
+write a newline to file descriptor <em>notif</em> then close it.
+This allows mdevd to use the
+<a href="//skarnet.org/software/s6/notifywhenup.html">s6 mechanism to notify
+readiness</a>. <em>notif</em> cannot be lesser than 3.
+If this option is not given, no readiness notification is sent. </li>
+ <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
+<em>kbufsz</em> bytes for the netlink queue. Too large a buffer wastes kernel memory;
+too small a buffer risks losing events. The default is 65536 (which is reasonable
+for average systems). </li>
  <li> <tt>-n</tt>&nbsp;: dry run. mdevd will not create or delete
 device nodes, and it will not spawn commands. Instead, it will print to stdout
 the actions it would have performed. </li>
@@ -121,14 +127,6 @@ nothing else.
 <h2> Notes </h2>
 
 <ul>
- <li> Strictly speaking, mdevd is a short-lived program: it has
-a normal exit condition, which is when it receives EOF on its stdin.
-That allows it to work as a coldplug manager when paired with
-<a href="mdevd-coldplug.html">mdevd-coldplug</a>. </li>
- <li> However, when paired with <a href="mdevd-netlink.html">mdevd-netlink</a>,
-it acts as a daemon, because mdev-netlink normally never exits until
-the end of the machine lifetime and never closes its stdout, so
-mdevd's stdin never receives EOF. </li>
  <li> The <tt>examples/</tt> subdirectory of the mdevd package contains
 examples on how to run mdevd under various init systems / supervisors. </li>
 </ul>

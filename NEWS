@@ -1,5 +1,14 @@
 Changelog for mdevd.
 
+In 0.1.0.0
+----------
+
+ - mdevd-netlink removed.
+ - mdevd now listens to the netlink itself.
+ - mdevd-coldplug now doesn't print events to stdout; it triggers
+the events in the kernel instead. This means mdevd should run first
+to catch the events, and then mdevd-coldplug should be ran.
+
 
 In 0.0.1.0
 ----------

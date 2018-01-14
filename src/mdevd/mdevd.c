@@ -1,7 +1,11 @@
 /* ISC license. */
 
-#include <sys/sysmacros.h>  /* makedev, major, minor */
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <sys/types.h>
+#include <sys/sysmacros.h>  /* makedev, major, minor */
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdint.h>
@@ -15,10 +19,12 @@
 #include <regex.h>
 #include <libgen.h>  /* basename */
 #include <stdio.h>  /* rename */
+#include <sys/socket.h>
+#include <linux/netlink.h>
+
 #include <skalibs/types.h>
 #include <skalibs/allreadwrite.h>
 #include <skalibs/bytestr.h>
-#include <skalibs/buffer.h>
 #include <skalibs/strerr2.h>
 #include <skalibs/sgetopt.h>
 #include <skalibs/sig.h>
@@ -28,16 +34,17 @@
 #include <skalibs/env.h>
 #include <skalibs/djbunix.h>
 #include <skalibs/iopause.h>
+#include <skalibs/socket.h>
 #include <skalibs/skamisc.h>
 #include <skalibs/surf.h>
 #include <skalibs/random.h>
-#include "mdevd.h"
 
-#define USAGE "mdevd [ -v verbosity ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
+#define USAGE "mdevd [ -v verbosity ] [ -1 ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
-#define BUFSIZE 8192
+#define CONFBUFSIZE 8192
 #define UEVENT_MAX_VARS 63
+#define UEVENT_MAX_SIZE 4096
 
 #define ACTION_NONE 0x0
 #define ACTION_ADD 0x1
@@ -172,6 +179,103 @@ static int makesubdirs (char *path)
   {
     if (verbosity) strerr_warnwu2sys("create subdirectories for ", path) ;
     return 0 ;
+  }
+  return 1 ;
+}
+
+
+ /* Netlink isolation layer */
+
+static inline ssize_t fd_recvmsg (int fd, struct msghdr *hdr)
+{
+  ssize_t r ;
+  do r = recvmsg(fd, hdr, MSG_DONTWAIT) ;
+  while ((r == -1) && (errno == EINTR)) ;
+  return r ;
+}
+
+static inline int netlink_init (unsigned int kbufsz)
+{
+  struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = 1, .nl_pid = 0 } ;
+  int fd = socket_internal(AF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT, DJBUNIX_FLAG_NB|DJBUNIX_FLAG_COE) ;
+  if (fd < 0) return -1 ;
+  if (bind(fd, (struct sockaddr *)&nl, sizeof(struct sockaddr_nl)) < 0
+   || (setsockopt(0, SOL_SOCKET, SO_RCVBUFFORCE, &kbufsz, sizeof(unsigned int)) < 0
+    && errno == EPERM
+    && setsockopt(0, SOL_SOCKET, SO_RCVBUF, &kbufsz, sizeof(unsigned int)) < 0))
+  {
+    fd_close(fd) ;
+    return -1 ;
+  }
+  return fd ;
+}
+
+static inline size_t netlink_read (char *s)
+{
+  struct sockaddr_nl nl;
+  struct iovec v = { .iov_base = s, .iov_len = UEVENT_MAX_SIZE } ;
+  struct msghdr msg =
+  {
+    .msg_name = &nl,
+    .msg_namelen = sizeof(struct sockaddr_nl),
+    .msg_iov = &v,
+    .msg_iovlen = 1,
+    .msg_control = 0,
+    .msg_controllen = 0,
+    .msg_flags = 0
+  } ;
+  ssize_t r = sanitize_read(fd_recvmsg(0, &msg)) ;
+  if (r < 0)
+  {
+    if (errno == EPIPE)
+    {
+      if (verbosity >= 2) strerr_warnw1x("received EOF on netlink") ;
+      cont = 0 ;
+      return 0 ;
+    }
+    else strerr_diefu1sys(111, "receive netlink message") ;
+  }
+  if (!r) return 0 ;
+  if (msg.msg_flags & MSG_TRUNC)
+    strerr_diefu1x(111, "buffer too small for netlink message") ;
+  if (nl.nl_pid)
+  {
+    if (verbosity >= 3)
+    {
+      char fmt[PID_FMT] ;
+      fmt[pid_fmt(fmt, nl.nl_pid)] = 0 ;
+      strerr_warnw2x("received netlink message from userspace process ", fmt) ;
+    }
+    return 0 ;
+  }
+  if (s[r-1])
+  {
+    if (verbosity) strerr_warnw2x("received invalid event: ", "improperly terminated") ;
+    return 0 ;
+  }
+  if (!strstr(s, "@/"))
+  {
+    if (verbosity) strerr_warnw2x("received invalid event: ", "bad initial summary") ;
+    return 0 ;
+  }
+  return r ;
+}
+
+static inline int uevent_read (struct uevent_s *event)
+{
+  unsigned short len = 0 ;
+  event->len = netlink_read(event->buf) ;
+  if (!event->len) return 0 ;
+  event->varn = 0 ;
+  while (len < event->len)
+  {
+    if (event->varn >= UEVENT_MAX_VARS)
+    {
+      if (verbosity) strerr_warnw2x("received invalid event: ", "too many variables") ;
+      return 0 ;
+    }
+    event->vars[event->varn++] = len ;
+    len += strlen(event->buf + len) + 1 ;
   }
   return 1 ;
 }
@@ -840,7 +944,7 @@ static inline void on_event (struct uevent_s *event, scriptelem const *script, u
 
  /* Tying it all together */
 
-static inline int handle_signals (void)
+static inline void handle_signals (void)
 {
   for (;;)
   {
@@ -848,8 +952,9 @@ static inline int handle_signals (void)
     switch (c)
     {
       case -1 : strerr_diefu1sys(111, "selfpipe_read") ;
-      case 0 : return 0 ;
-      case SIGHUP : return 1 ;
+      case SIGTERM :
+      case SIGHUP : cont = c == SIGHUP ;
+      case 0 : return ;
       case SIGCHLD :
         if (!pid) wait_reap() ;
         else
@@ -869,54 +974,37 @@ static inline int handle_signals (void)
   }
 }
 
-static void handle_stdin (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, size_t *w)
+static inline void handle_event (scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
 {
-  while (!pid)
-  {
-    ssize_t r ;
-    if (event->len >= UEVENT_MAX_SIZE)
-      strerr_dief2x(1, "received invalid event: ", "too long") ;
-    r = sanitize_read(getlnmax(buffer_0, event->buf + event->len, UEVENT_MAX_SIZE - event->len, w, '\0')) ;
-    if (r < 0)
-    {
-      cont = 0 ;
-      if (errno != EPIPE && verbosity) strerr_warnwu1sys("read from stdin") ;
-      if (event->len) strerr_dief1x(1, "received incomplete event") ;
-    }
-    if (r <= 0) break ;
-    if (*w > 1)
-    {
-      if (event->varn >= UEVENT_MAX_VARS)
-        strerr_dief2x(1, "received invalid event: ", "too many variables") ;
-      event->vars[event->varn++] = event->len ;
-      event->len += *w ;
-    }
-    else
-    {
-      if (event->varn > 1) on_event(event, script, scriptlen, storage, envmatch) ;
-      event->len = 0 ;
-      event->varn = 0 ;
-    }
-    *w = 0 ;
-  }
+  struct uevent_s event = UEVENT_ZERO ;
+  if (uevent_read(&event) && event.varn > 1)
+    on_event(&event, script, scriptlen, storage, envmatch) ;
 }
 
 int main (int argc, char const *const *argv)
 {
   char const *configfile = "/etc/mdev.conf" ;
-  iopause_fd x[2] = { { .events = IOPAUSE_READ }, { .fd = 0 } } ;
+  iopause_fd x[2] = { { .events = IOPAUSE_READ }, { .events = IOPAUSE_READ } } ;
+  unsigned int notif = 0 ;
+  unsigned int kbufsz = 65536 ;
+  char const *slashdev = "/dev" ;
   PROG = "mdevd" ;
   {
-    char const *slashdev = "/dev" ;
     subgetopt_t l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "nv:f:s:d:F:", &l) ;
+      int opt = subgetopt_r(argc, argv, "nv:D:b:f:s:d:F:", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
         case 'n' : dryrun = 1 ; break ;
         case 'v' : if (!uint0_scan(l.arg, &verbosity)) dieusage() ; break ;
+        case 'D' :
+          if (!uint0_scan(l.arg, &notif)) dieusage() ;
+          if (notif < 3) strerr_dief1x(100, "notification fd must be 3 or more") ;
+          if (fcntl(notif, F_GETFD) < 0) strerr_dief1sys(100, "invalid notification fd") ;
+          break ;
+        case 'b' : if (!uint0_scan(l.arg, &kbufsz)) dieusage() ; break ;
         case 'f' : configfile = l.arg ; break ;
         case 's' : slashsys = l.arg ; break ;
         case 'd' : slashdev = l.arg ; break ;
@@ -925,13 +1013,13 @@ int main (int argc, char const *const *argv)
       }
     }
     argc -= l.ind ; argv += l.ind ;
-    if (configfile[0] != '/') strerr_dief2x(100, configfile, " is not an absolute path") ;
-    if (slashsys[0] != '/') strerr_dief2x(100, slashsys, " is not an absolute path") ;
-    if (slashdev[0] != '/') strerr_dief2x(100, slashdev, " is not an absolute path") ;
-    if (fwbase[0] != '/') strerr_dief2x(100, fwbase, " is not an absolute path") ;
-    if (chdir(slashdev) < 0) strerr_diefu2sys(111, "chdir to ", slashdev) ;
   }
 
+  if (configfile[0] != '/') strerr_dief2x(100, configfile, " is not an absolute path") ;
+  if (slashsys[0] != '/') strerr_dief2x(100, slashsys, " is not an absolute path") ;
+  if (slashdev[0] != '/') strerr_dief2x(100, slashdev, " is not an absolute path") ;
+  if (fwbase[0] != '/') strerr_dief2x(100, fwbase, " is not an absolute path") ;
+  if (chdir(slashdev) < 0) strerr_diefu2sys(111, "chdir to ", slashdev) ;
   if (strlen(slashsys) >= PATH_MAX - 1) strerr_dief1x(100, "paths too long") ;
   if (!fd_sanitize()) strerr_diefu1sys(111, "sanitize standard fds") ;
 
@@ -942,13 +1030,16 @@ int main (int argc, char const *const *argv)
     root_min = minor(st.st_dev) ;
   }
 
-  if (ndelay_on(0) < 0) strerr_diefu1sys(111, "set stdin nonblocking") ;
+  x[1].fd = netlink_init(kbufsz) ;
+  if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
+
   x[0].fd = selfpipe_init() ;
   if (x[0].fd < 0) strerr_diefu1sys(111, "init selfpipe") ;
   if (sig_ignore(SIGPIPE) < 0) strerr_diefu1sys(111, "ignore SIGPIPE") ;
   {
     sigset_t set ;
     sigemptyset(&set) ;
+    sigaddset(&set, SIGTERM) ;
     sigaddset(&set, SIGCHLD) ;
     sigaddset(&set, SIGHUP) ;
     if (selfpipe_trapset(&set) < 0)
@@ -957,43 +1048,47 @@ int main (int argc, char const *const *argv)
   mdevd_random_init() ;
   umask(0) ;
 
+  if (notif)
+  {
+    fd_write(notif, "\n", 1) ;
+    fd_close(notif) ;
+  }
+
   while (cont)
   {
     ssize_t len ;
     unsigned short scriptlen = 0 ;
     unsigned short envmatchlen = 0 ;
-    char buf[BUFSIZE] ;
-    len = openreadnclose(configfile, buf, BUFSIZE - 1) ;
+    char storage[CONFBUFSIZE] ;
+    len = openreadnclose(configfile, storage, CONFBUFSIZE - 1) ;
     if (len < 0)
     {
       if (errno != ENOENT) strerr_diefu2sys(111, "read ", configfile) ;
       if (verbosity) strerr_warnwu2sys("read ", configfile) ;
       len = 0 ;
     }
-    buf[len++] = 0 ;
-    script_firstpass(buf, &scriptlen, &envmatchlen) ;
+    storage[len++] = 0 ;
+    script_firstpass(storage, &scriptlen, &envmatchlen) ;
 
     {
-      size_t w = 0 ;
-      int reload = 0 ;
-      struct uevent_s event = UEVENT_ZERO ;
       struct envmatch_s envmatch[envmatchlen ? envmatchlen : 1] ;
       scriptelem script[scriptlen + 1] ;
       memset(script, 0, scriptlen * sizeof(scriptelem)) ;
       script[scriptlen++] = scriptelem_catchall ;
-      script_secondpass(buf, script, envmatch) ;
-      while (pid || (cont && (!reload || buffer_len(buffer_0))))
+      script_secondpass(storage, script, envmatch) ;
+      cont = 2 ;
+
+      while (pid || cont == 2)
       {
-        if (buffer_len(buffer_0)) handle_stdin(&event, script, scriptlen, buf, envmatch, &w) ;
-        x[1].events = pid ? 0 : IOPAUSE_READ ;
-        if (iopause(x, 1 + cont, 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
-        if (x[0].revents & IOPAUSE_READ && handle_signals()) reload = 1 ;
-        if (cont && !pid && x[1].revents & IOPAUSE_READ)
-          handle_stdin(&event, script, scriptlen, buf, envmatch, &w) ;
+        if (iopause(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
+        if (x[0].revents & IOPAUSE_READ)
+          handle_signals() ;
+        if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
+          handle_event(script, scriptlen, storage, envmatch) ;
       }
+
       script_free(script, scriptlen, envmatch, envmatchlen) ;
     }
   }
-  ndelay_off(0) ;
   return 0 ;
 }
