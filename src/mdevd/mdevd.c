@@ -210,7 +210,7 @@ static inline int netlink_init (unsigned int kbufsz)
   return fd ;
 }
 
-static inline size_t netlink_read (char *s)
+static inline size_t netlink_read (int fd, char *s)
 {
   struct sockaddr_nl nl;
   struct iovec v = { .iov_base = s, .iov_len = UEVENT_MAX_SIZE } ;
@@ -224,7 +224,7 @@ static inline size_t netlink_read (char *s)
     .msg_controllen = 0,
     .msg_flags = 0
   } ;
-  ssize_t r = sanitize_read(fd_recvmsg(0, &msg)) ;
+  ssize_t r = sanitize_read(fd_recvmsg(fd, &msg)) ;
   if (r < 0)
   {
     if (errno == EPIPE)
@@ -261,10 +261,10 @@ static inline size_t netlink_read (char *s)
   return r ;
 }
 
-static inline int uevent_read (struct uevent_s *event)
+static inline int uevent_read (int fd, struct uevent_s *event)
 {
   unsigned short len = 0 ;
-  event->len = netlink_read(event->buf) ;
+  event->len = netlink_read(fd, event->buf) ;
   if (!event->len) return 0 ;
   event->varn = 0 ;
   while (len < event->len)
@@ -974,10 +974,10 @@ static inline void handle_signals (void)
   }
 }
 
-static inline void handle_event (scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
+static inline void handle_event (int fd, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
 {
   struct uevent_s event = UEVENT_ZERO ;
-  if (uevent_read(&event) && event.varn > 1)
+  if (uevent_read(fd, &event) && event.varn > 1)
     on_event(&event, script, scriptlen, storage, envmatch) ;
 }
 
@@ -1084,7 +1084,7 @@ int main (int argc, char const *const *argv)
         if (x[0].revents & IOPAUSE_READ)
           handle_signals() ;
         if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          handle_event(script, scriptlen, storage, envmatch) ;
+          handle_event(x[1].fd, script, scriptlen, storage, envmatch) ;
       }
 
       script_free(script, scriptlen, envmatch, envmatchlen) ;
