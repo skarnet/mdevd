@@ -803,9 +803,12 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
 
   if (action & elem->cmdtype)
   {
-    event->vars[event->varn++] = event->len ;
-    memcpy(event->buf + event->len, "MDEV=", 5) ;
-    event->len += 6 + nodelen ;
+    if (!event_getvar(event, "MDEV"))
+    {
+      event->vars[event->varn++] = event->len ;
+      memcpy(event->buf + event->len, "MDEV=", 5) ;
+      event->len += 6 + nodelen ;
+    }
     if (dryrun)
     {
       strerr_warni2x("dry run: spawn ", storage + elem->command) ;
