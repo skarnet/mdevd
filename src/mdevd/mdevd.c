@@ -987,7 +987,7 @@ int main (int argc, char const *const *argv)
   char const *configfile = "/etc/mdev.conf" ;
   iopause_fd x[2] = { { .events = IOPAUSE_READ }, { .events = IOPAUSE_READ } } ;
   unsigned int notif = 0 ;
-  unsigned int kbufsz = 65536 ;
+  unsigned int kbufsz = 196608 ;
   char const *slashdev = "/dev" ;
   PROG = "mdevd" ;
   {
