@@ -128,7 +128,13 @@ nothing else.
 
 <ul>
  <li> The <tt>examples/</tt> subdirectory of the mdevd package contains
-examples on how to run mdevd under various init systems / supervisors. </li>
+examples on how to run mdevd under various init systems / supervisors. These
+examples do not show how to run mdevd as a logged service, because mdevd
+should normally be run early in the system's boot up sequence, before
+mounting the disks - so the presence of a mounted partition suitable for
+logging is not guaranteed. In normal use, mdevd is quite terse, so it
+runs smoothly without a dedicated logger, with its error messages
+going to the catch-all logger. </li>
 </ul>
 
 </body>
