@@ -33,11 +33,7 @@ static void scan_subdir (int fdat, char const *pathat, char const *list)
       memcpy(fn, d->d_name, dlen) ;
       memcpy(fn + dlen, "/uevent", 8) ;
       fd = openat(fdlist, fn, O_WRONLY) ;
-      if (fd < 0)
-      {
-        strerr_warnwu6sys("open ", pathat, "/", list, "/", fn) ;
-        continue ;
-      }
+      if (fd < 0) continue ;
       if (write(fd, "add\n", 4) < 4)
         strerr_warnwu6sys("write to ", pathat, "/", list, "/", fn) ;
       close(fd) ;

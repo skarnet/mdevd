@@ -933,12 +933,11 @@ static inline void on_event (struct uevent_s *event, scriptelem const *script, u
   {
     size_t devpathlen = strlen(x) ;
     size_t slashsyslen = strlen(slashsys) ;
-    char sysdevpath[devpathlen + slashsyslen + 2 + 7] ;
+    char sysdevpath[devpathlen + slashsyslen + 8] ; /* act_on_event needs the extra storage */
     memcpy(sysdevpath, slashsys, slashsyslen) ;
-    sysdevpath[slashsyslen] = '/' ;
-    memcpy(sysdevpath + slashsyslen + 1, x, devpathlen + 1) ;
+    memcpy(sysdevpath + slashsyslen, x, devpathlen + 1) ;
     x = event_getvar(event, "FIRMWARE") ;
-    if (action == ACTION_ADD || !x) act_on_event(event, sysdevpath, slashsyslen + devpathlen + 1, action, script, scriptlen, storage, envmatch) ;
+    if (action == ACTION_ADD || !x) act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch) ;
     if (action == ACTION_ADD && x) load_firmware(x, sysdevpath) ;
   }
 }
