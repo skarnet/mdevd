@@ -91,8 +91,9 @@ readiness</a>. <em>notif</em> cannot be lesser than 3.
 If this option is not given, no readiness notification is sent. </li>
  <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
 <em>kbufsz</em> bytes for the netlink queue. Too large a buffer wastes kernel memory;
-too small a buffer risks losing events. The default is 196608
-(192 kB, which is on the large side for average systems). </li>
+too small a buffer risks losing events. The default is 500 kB, which should be
+enough for most systems; if you're getting "No buffer space available" errors
+from mdevd at coldplug time, try increasing this number. </li>
  <li> <tt>-n</tt>&nbsp;: dry run. mdevd will not create or delete
 device nodes, and it will not spawn commands. Instead, it will print to stdout
 the actions it would have performed. </li>
