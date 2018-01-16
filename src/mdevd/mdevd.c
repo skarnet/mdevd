@@ -541,7 +541,7 @@ static inline void load_firmware (char const *fw, char const *sysdevpath)
   size_t fwbaselen = strlen(fwbase) ;
   size_t fwlen = strlen(fw) ;
   size_t sysdevpathlen = strlen(sysdevpath) ;
-  int fwfd, loadingfd ;
+  int fwfd, loadingfd, datafd ;
   char fwfn[fwbaselen + fwlen + 2] ;
   memcpy(fwfn, fwbase, fwbaselen) ;
   fwfn[fwbaselen] = '/' ;
@@ -566,7 +566,6 @@ static inline void load_firmware (char const *fw, char const *sysdevpath)
     goto errclosel ;
   }
   {
-    int datafd ;
     char datafn[sysdevpathlen + 6] ;
     memcpy(datafn, sysdevpath, sysdevpathlen) ;
     memcpy(datafn + sysdevpathlen, "/data", 6) ;
@@ -579,12 +578,12 @@ static inline void load_firmware (char const *fw, char const *sysdevpath)
     if (ndelay_off(datafd) < 0)
     {
       if (verbosity >= 2) strerr_warnwu2sys("ndelay_off ", datafn) ;
-      goto errload ;
+      goto errdata ;
     }
     if (fd_cat(fwfd, datafd) < 0)
     {
       if (verbosity >= 2) strerr_warnwu4sys("copy ", fwfn, " to ", datafn) ;
-      goto errload ;
+      goto errdata ;
     }
     fd_close(datafd) ;
     fd_write(loadingfd, "0", 1) ;
@@ -593,6 +592,8 @@ static inline void load_firmware (char const *fw, char const *sysdevpath)
   fd_close(fwfd) ;
   return ;
 
+ errdata:
+  fd_close(datafd) ;
  errload:
   allwrite(loadingfd, "-1", 2) ;
  errclosel:
