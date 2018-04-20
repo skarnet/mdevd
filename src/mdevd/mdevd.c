@@ -39,7 +39,7 @@
 #include <skalibs/surf.h>
 #include <skalibs/random.h>
 
-#define USAGE "mdevd [ -v verbosity ] [ -1 ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
+#define USAGE "mdevd [ -v verbosity ] [ -1 ] [ -D notif ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 #define CONFBUFSIZE 8192
