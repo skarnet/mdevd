@@ -22,6 +22,7 @@
 #include <sys/socket.h>
 #include <linux/netlink.h>
 
+#include <skalibs/posixplz.h>
 #include <skalibs/types.h>
 #include <skalibs/allreadwrite.h>
 #include <skalibs/bytestr.h>
@@ -795,7 +796,7 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
           {
             if (verbosity)
               strerr_warnwu4sys("rename ", tmppath, " to ", devname) ;
-            unlink(tmppath) ;
+            unlink_void(tmppath) ;
           }
         }
       }
@@ -837,10 +838,10 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     if (elem->movetype == MOVEINFO_MOVEANDLINK)
     {
       if (dryrun) strerr_warni2x("dry run: unlink ", devname) ;
-      else unlink(devname) ;
+      else unlink_void(devname) ;
     }
     if (dryrun) strerr_warni2x("dry run: unlink ", node) ;
-    else unlink(node) ;
+    else unlink_void(node) ;
   }
 
   return !elem->flagcont ;  
