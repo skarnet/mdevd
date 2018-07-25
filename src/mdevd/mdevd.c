@@ -1085,7 +1085,7 @@ int main (int argc, char const *const *argv)
 
       while (pid || cont == 2)
       {
-        if (iopause(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
+        if (iopause_stamp(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ)
           handle_signals() ;
         if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
