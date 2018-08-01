@@ -5,6 +5,7 @@ In 0.1.0.2
 
  - Bugfixes.
  - Adaptation to skalibs-2.7.0.0.
+ - Optional nsss support added.
 
 
 In 0.1.0.1
