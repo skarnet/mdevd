@@ -8,7 +8,7 @@ needs to be registered as a hotplug manager and the kernel forks
 an instance of mdev for every event; by contrast, mdevd is a daemon
 and does not fork.
 
- See http://skarnet.org/software/mdevd/ for details.
+ See https://skarnet.org/software/mdevd/ for details.
 
 
 * Installation
