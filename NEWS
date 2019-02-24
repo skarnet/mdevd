@@ -1,5 +1,12 @@
 Changelog for mdevd.
 
+In 0.1.0.3
+----------
+
+ - Adaptation to skalibs-2.8.0.0.
+ - Everything builds as PIC by default.
+
+
 In 0.1.0.2
 ----------
 
