@@ -6,7 +6,7 @@ mdevd - a mdev-compatible hotplug manager daemon
 manager integrated in the Busybox suite of tools. However, mdev
 needs to be registered as a hotplug manager and the kernel forks
 an instance of mdev for every event; by contrast, mdevd is a daemon
-and does not fork.
+listening to the netlink, and does not fork.
 
  See https://skarnet.org/software/mdevd/ for details.
 
