@@ -5,7 +5,7 @@
 src/mdevd/mdevd-coldplug.o src/mdevd/mdevd-coldplug.lo: src/mdevd/mdevd-coldplug.c
 src/mdevd/mdevd.o src/mdevd/mdevd.lo: src/mdevd/mdevd.c
 
-mdevd: EXTRA_LIBS := ${MAYBEPTHREAD_LIB}
-mdevd: src/mdevd/mdevd.o ${LIBNSSS} -lskarnet
-mdevd-coldplug: EXTRA_LIBS :=
-mdevd-coldplug: src/mdevd/mdevd-coldplug.o -lskarnet
+mdevd: EXTRA_LIBS := -lskarnet ${MAYBEPTHREAD_LIB}
+mdevd: src/mdevd/mdevd.o ${LIBNSSS}
+mdevd-coldplug: EXTRA_LIBS := -lskarnet
+mdevd-coldplug: src/mdevd/mdevd-coldplug.o
