@@ -62,24 +62,29 @@ by a supervision suite. </li>
 (via <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/putenv.html">putenv()</a>
 and <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/unsetenv.html">unsetenv()</a>)
 to store uevent data for each event. This implies repeated allocations of
-heap memory. By contrast, mdevd does not use its own environment, and
-even does not use heap memory at all. </li>
+heap memory. By contrast, mdevd does not use its own environment - it
+actually does not use heap memory at all. All the memory it uses is
+committed (in the stack) at start time, and it will never grow during
+its lifetime. </li>
  <li> Better speed: <tt>mdev -d</tt> parses its config file for every
 event it receives, and has to perform expensive operations such as
 <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/getpwnam.html">getpwnam()</a>
-every time it receives an event (which can add up to hundreds of time at boot!).
-By contrast, mdevd parses its config file only once, when it starts - or when
-it is told to read it again by a SIGHUP. So it processes events significantly
-faster. </li>
+every time it receives an event (which can add up to hundreds of times at boot!).
+By contrast, mdevd only parses its config file when it starts - or when
+it is told to read it again by a SIGHUP; the event processing is
+streamlined, it does not involve any parsing or any kind of expensive
+operation - so it is significantly faster. </li>
  <li> Independence from busybox: <tt>mdev</tt> is part of the
 <a href="https://busybox.net/">busybox</a> software. It is an advantage
-when Busybox is also used to provide other functionality, such as
-coreutils or util-linux equivalents. However, some distributions find
-that functionality lacking in compatibility, and choose to use alternatives
-to busybox. In that case, having to use the whole busybox configuration
-and build process just for mdev is a drawback, and the code is bigger than
-it needs to be. mdevd, on the other hand, is independent software, and
-building it is simple and does not pull in any unnecessary code. </li>
+when busybox is also used to provide other functionality, such as
+coreutils or util-linux equivalents. However, most distributions find
+that functionality lacking in compatibility (for instance, the busybox
+implementation of POSIX utilities is often non-conformant), and choose to
+use alternatives to busybox instead. In that case, having to use the whole
+busybox configuration and build process just for mdev is a drawback, and
+the code that gets included in the mdev binary is bigger than it needs to be.
+mdevd, on the other hand, is independent software, and building it is simple
+and does not pull in any unnecessary code. </li>
 </ul>
 
 <hr />
