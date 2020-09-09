@@ -42,6 +42,46 @@ entirely compatible with advanced mdev usage such as
 <a href="https://github.com/slashbeast/mdev-like-a-boss">mdev-like-a-boss</a>.
 </p>
 
+<a name="mdev">
+<h2> Comparison with <tt>mdev -d</tt> </h2>
+</a>
+
+<p>
+ Recent versions of <a href="https://git.busybox.net/busybox/tree/util-linux/mdev.c">mdev</a>
+have a <tt>-d</tt> option that allow it to run as a daemon. However,
+mdevd still has advantages over <tt>mdev -d</tt>:
+</p>
+
+<ul>
+ <li> Better log management: <tt>mdev -d</tt> logs to a fixed text file, with
+all the issues it implies (need for the filesystem to be read-write,
+uncontrollable log file growth). By contrast, mdevd logs to stderr and its
+messages can be handled by any log infrastructure such as the one provided
+by a supervision suite. </li>
+ <li> Better memory efficiency: <tt>mdev -d</tt> uses its own environment
+(via <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/putenv.html">putenv()</a>
+and <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/unsetenv.html">unsetenv()</a>)
+to store uevent data for each event. This implies repeated allocations of
+heap memory. By contrast, mdevd does not use its own environment, and
+even does not use heap memory at all. </li>
+ <li> Better speed: <tt>mdev -d</tt> parses its config file for every
+event it receives, and has to perform expensive operations such as
+<a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/getpwnam.html">getpwnam()</a>
+every time it receives an event (which can add up to hundreds of time at boot!).
+By contrast, mdevd parses its config file only once, when it starts - or when
+it is told to read it again by a SIGHUP. So it processes events significantly
+faster. </li>
+ <li> Independence from busybox: <tt>mdev</tt> is part of the
+<a href="https://busybox.net/">busybox</a> software. It is an advantage
+when Busybox is also used to provide other functionality, such as
+coreutils or util-linux equivalents. However, some distributions find
+that functionality lacking in compatibility, and choose to use alternatives
+to busybox. In that case, having to use the whole busybox configuration
+and build process just for mdev is a drawback, and the code is bigger than
+it needs to be. mdevd, on the other hand, is independent software, and
+building it is simple and does not pull in any unnecessary code. </li>
+</ul>
+
 <hr />
 
 <h2> Installation </h2>
