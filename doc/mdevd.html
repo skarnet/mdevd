@@ -49,7 +49,7 @@ to running mdevd over mdev. </li>
 <h2> Interface </h2>
 
 <pre>
-     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ]
+     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -o <em>outputfd</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ]
 </pre>
 
 <ul>
@@ -92,6 +92,18 @@ This allows mdevd to use the
 <a href="//skarnet.org/software/s6/notifywhenup.html">s6 mechanism to notify
 readiness</a>. <em>notif</em> cannot be lesser than 3.
 If this option is not given, no readiness notification is sent. </li>
+ <li> <tt>-o</tt>&nbsp;<em>outputfd</em>&nbsp;: send a copy of the complete
+uevent, with possible new fields, to file descriptor <em>outputfd</em>,
+<strong>after</strong> mdevd has handled them. (This can serve as a
+synchronization mechanism with an external program that needs a device to
+have been properly configured by the device manager before acting on the
+device.)
+The uevent is sent with the kernel format: fields are separated by a null
+character. The uevent is terminated by an additional null character.
+<em>outputfd</em> cannot be lesser than 3 and cannot be the same as <em>notif</em>.
+If for any reason, at any point, mdevd fails to write to <em>outputfd</em>,
+it stops writing, until it is restarted. (This is to preserve mdevd's memory
+stability guarantee.) By default, the uevents are not written anywhere. </li>
  <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
 <em>kbufsz</em> bytes for the netlink queue. Too large a buffer wastes kernel memory;
 too small a buffer risks losing events. The default is 500 kB, which should be

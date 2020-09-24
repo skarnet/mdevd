@@ -7,6 +7,7 @@
 #include <sys/types.h>
 #include <sys/sysmacros.h>  /* makedev, major, minor */
 #include <sys/stat.h>
+#include <sys/uio.h>
 #include <fcntl.h>
 #include <stdint.h>
 #include <unistd.h>
@@ -40,7 +41,7 @@
 #include <skalibs/surf.h>
 #include <skalibs/random.h>
 
-#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
+#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 #define CONFBUFSIZE 8192
@@ -54,6 +55,7 @@
 static int dryrun = 0 ;
 static int cont = 1 ;
 static pid_t pid = 0 ;
+static unsigned int outputfd = 0 ;
 static unsigned int verbosity = 1 ;
 static char const *slashsys = "/sys" ;
 static char const *fwbase = "/lib/firmware" ;
@@ -950,8 +952,9 @@ static inline void on_event (struct uevent_s *event, scriptelem const *script, u
 
  /* Tying it all together */
 
-static inline void handle_signals (void)
+static inline int handle_signals (void)
 {
+  int e = 0 ;
   for (;;)
   {
     int c = selfpipe_read() ;
@@ -960,7 +963,7 @@ static inline void handle_signals (void)
       case -1 : strerr_diefu1sys(111, "selfpipe_read") ;
       case SIGTERM :
       case SIGHUP : cont = c == SIGHUP ;
-      case 0 : return ;
+      case 0 : return e ;
       case SIGCHLD :
         if (!pid) wait_reap() ;
         else
@@ -972,6 +975,7 @@ static inline void handle_signals (void)
             else break ;
           else if (!r) break ;
           pid = 0 ;
+          e = 1 ;
         }
         break ;
       default :
@@ -980,11 +984,25 @@ static inline void handle_signals (void)
   }
 }
 
-static inline void handle_event (int fd, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
+static inline int handle_event (int fd, struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
 {
-  struct uevent_s event = UEVENT_ZERO ;
-  if (uevent_read(fd, &event) && event.varn > 1)
-    on_event(&event, script, scriptlen, storage, envmatch) ;
+  if (!uevent_read(fd, event) || event->varn <= 1) return 0 ;
+    on_event(event, script, scriptlen, storage, envmatch) ;
+  return 1 ;
+}
+
+static void output_event (struct uevent_s *event)
+{
+  static char const c = 0 ;
+  struct iovec v[2] = { { .iov_base = event->buf, .iov_len = event->len }, { .iov_base = (char *)&c, .iov_len = 1 } } ;
+  if (fd_writev(outputfd, v, 2) < event->len + 1)
+  {
+    char fmt[UINT_FMT] ;
+    fmt[uint_fmt(fmt, outputfd)] = 0 ;
+    fd_close(outputfd) ;
+    outputfd = 0 ;
+    strerr_warnwu3sys("write to descriptor ", fmt, " (closing it)") ;
+  }
 }
 
 int main (int argc, char const *const *argv)
@@ -999,7 +1017,7 @@ int main (int argc, char const *const *argv)
     subgetopt_t l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "nv:D:b:f:s:d:F:", &l) ;
+      int opt = subgetopt_r(argc, argv, "nv:D:o:b:f:s:d:F:", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
@@ -1009,6 +1027,14 @@ int main (int argc, char const *const *argv)
           if (!uint0_scan(l.arg, &notif)) dieusage() ;
           if (notif < 3) strerr_dief1x(100, "notification fd must be 3 or more") ;
           if (fcntl(notif, F_GETFD) < 0) strerr_dief1sys(100, "invalid notification fd") ;
+          if (outputfd == notif) strerr_dief1x(100, "output fd and notification fd must not be the same") ;
+          break ;
+        case 'o' :
+          if (!uint0_scan(l.arg, &outputfd)) dieusage() ;
+          if (outputfd < 3) strerr_dief1x(100, "output fd must be 3 or more") ;
+          if (fcntl(outputfd, F_GETFD) < 0) strerr_dief1sys(100, "invalid output fd") ;
+          if (outputfd == notif) strerr_dief1x(100, "output fd and notification fd must not be the same") ;
+          if (ndelay_on(outputfd) < 0) strerr_diefu1sys(111, "set output fd non-blocking") ;
           break ;
         case 'b' : if (!uint0_scan(l.arg, &kbufsz)) dieusage() ; break ;
         case 'f' : configfile = l.arg ; break ;
@@ -1071,6 +1097,7 @@ int main (int argc, char const *const *argv)
     script_firstpass(storage, &scriptlen, &envmatchlen) ;
 
     {
+      struct uevent_s event = UEVENT_ZERO ;
       struct envmatch_s envmatch[envmatchlen ? envmatchlen : 1] ;
       scriptelem script[scriptlen + 1] ;
       memset(script, 0, scriptlen * sizeof(scriptelem)) ;
@@ -1088,9 +1115,11 @@ int main (int argc, char const *const *argv)
       {
         if (iopause_stamp(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ)
-          handle_signals() ;
+          if (handle_signals() && outputfd)
+            output_event(&event) ;
         if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          handle_event(x[1].fd, script, scriptlen, storage, envmatch) ;
+          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch) && !pid && outputfd)
+            output_event(&event) ;
       }
 
       script_free(script, scriptlen, envmatch, envmatchlen) ;

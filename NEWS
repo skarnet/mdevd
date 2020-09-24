@@ -1,5 +1,11 @@
 Changelog for mdevd.
 
+In 0.1.2.0
+----------
+
+ - -o fd option to see the uevents after mdevd has processed them.
+
+
 In 0.1.1.2
 ----------
 
