@@ -1023,19 +1023,8 @@ int main (int argc, char const *const *argv)
       {
         case 'n' : dryrun = 1 ; break ;
         case 'v' : if (!uint0_scan(l.arg, &verbosity)) dieusage() ; break ;
-        case 'D' :
-          if (!uint0_scan(l.arg, &notif)) dieusage() ;
-          if (notif < 3) strerr_dief1x(100, "notification fd must be 3 or more") ;
-          if (fcntl(notif, F_GETFD) < 0) strerr_dief1sys(100, "invalid notification fd") ;
-          if (outputfd == notif) strerr_dief1x(100, "output fd and notification fd must not be the same") ;
-          break ;
-        case 'o' :
-          if (!uint0_scan(l.arg, &outputfd)) dieusage() ;
-          if (outputfd < 3) strerr_dief1x(100, "output fd must be 3 or more") ;
-          if (fcntl(outputfd, F_GETFD) < 0) strerr_dief1sys(100, "invalid output fd") ;
-          if (outputfd == notif) strerr_dief1x(100, "output fd and notification fd must not be the same") ;
-          if (ndelay_on(outputfd) < 0) strerr_diefu1sys(111, "set output fd non-blocking") ;
-          break ;
+        case 'D' : if (!uint0_scan(l.arg, &notif)) dieusage() ; break ;
+        case 'o' : if (!uint0_scan(l.arg, &outputfd)) dieusage() ; break ;
         case 'b' : if (!uint0_scan(l.arg, &kbufsz)) dieusage() ; break ;
         case 'f' : configfile = l.arg ; break ;
         case 's' : slashsys = l.arg ; break ;
@@ -1054,6 +1043,19 @@ int main (int argc, char const *const *argv)
   if (chdir(slashdev) < 0) strerr_diefu2sys(111, "chdir to ", slashdev) ;
   if (strlen(slashsys) >= PATH_MAX - 1) strerr_dief1x(100, "paths too long") ;
   if (!fd_sanitize()) strerr_diefu1sys(111, "sanitize standard fds") ;
+  if (notif)
+  {
+    if (notif < 3) strerr_dief1x(100, "notification fd must be 3 or more") ;
+    if (fcntl(notif, F_GETFD) < 0) strerr_dief1sys(100, "invalid notification fd") ;
+  }
+  if (outputfd)
+  {
+    if (outputfd < 3) strerr_dief1x(100, "output fd must be 3 or more") ;
+    if (fcntl(outputfd, F_GETFD) < 0) strerr_dief1sys(100, "invalid output fd") ;
+    if (outputfd == notif) strerr_dief1x(100, "output fd and notification fd must not be the same") ;
+    if (ndelay_on(outputfd) < 0) strerr_diefu1sys(111, "set output fd non-blocking") ;
+    if (coe(outputfd) < 0) strerr_diefu1sys(111, "set output fd close-on-exec") ;
+  }
 
   {
     struct stat st ;
@@ -1076,6 +1078,7 @@ int main (int argc, char const *const *argv)
     if (selfpipe_trapset(&set) < 0)
       strerr_diefu1sys(111, "trap signals") ;
   }
+
   tain_now_set_stopwatch_g() ;
   mdevd_random_init() ;
   umask(0) ;
