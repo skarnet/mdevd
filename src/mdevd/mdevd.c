@@ -41,7 +41,9 @@
 #include <skalibs/surf.h>
 #include <skalibs/random.h>
 
-#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ]"
+#include <mdevd/config.h>
+
+#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 #define CONFBUFSIZE 8192
@@ -1012,12 +1014,13 @@ int main (int argc, char const *const *argv)
   unsigned int notif = 0 ;
   unsigned int kbufsz = 512288 ;
   char const *slashdev = "/dev" ;
+  int docoldplug = 0 ;
   PROG = "mdevd" ;
   {
     subgetopt_t l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "nv:D:o:b:f:s:d:F:", &l) ;
+      int opt = subgetopt_r(argc, argv, "nv:D:o:b:f:s:d:F:C", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
@@ -1030,6 +1033,7 @@ int main (int argc, char const *const *argv)
         case 's' : slashsys = l.arg ; break ;
         case 'd' : slashdev = l.arg ; break ;
         case 'F' : fwbase = l.arg ; break ;
+        case 'C' : docoldplug = 1 ; break ;
         default : dieusage() ;
       }
     }
@@ -1107,6 +1111,14 @@ int main (int argc, char const *const *argv)
       script[scriptlen++] = scriptelem_catchall ;
       script_secondpass(storage, script, envmatch) ;
       cont = 2 ;
+      if (docoldplug)
+      {
+        char const *cargv[2] = { MDEVD_BINPREFIX "mdevd-coldplug", 0 } ;
+        char const *cenv = 0 ;
+        if (!child_spawn0(cargv[0], cargv, &cenv))
+          strerr_warnwu2sys("spawn ", cargv[0]) ;
+        docoldplug = 0 ;
+      }
       if (notif)
       {
         fd_write(notif, "\n", 1) ;

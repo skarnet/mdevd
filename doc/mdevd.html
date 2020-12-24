@@ -49,7 +49,7 @@ to running mdevd over mdev. </li>
 <h2> Interface </h2>
 
 <pre>
-     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -o <em>outputfd</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ]
+     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -o <em>outputfd</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ] [ -C ]
 </pre>
 
 <ul>
@@ -124,6 +124,17 @@ are to be found in  <em>slashdev</em>. Default is <tt>/dev</tt>.
  <li> <tt>-F</tt>&nbsp;<em>fwbase</em>&nbsp;: assume the firmware files, if any,
 are to be found in  <em>fwbase</em>. Default is <tt>/lib/firmware</tt>.
 <em>fwbase</em> must be an absolute path. </li>
+ <li> <tt>-C</tt>&nbsp;: after initialization (when mdevd is ready), invoke
+<a href="mdevd-coldplug.html">mdevd-coldplug</a>, so that a coldplug is
+automatically performed when mdevd starts. This option should only be used
+in situations where a drop-in replacement for <tt>mdev -d</tt> is needed, because
+it has the drawback of performing a coldplug every time mdevd is started &mdash;
+including when mdevd is killed and restarted. By default, mdevd does not perform
+a coldplug when it starts, and it is up to the administrator to properly organize
+their boot scripts to run <a href="mdevd-coldplug.html">mdevd-coldplug</a> once,
+at boot time, when mdevd is ready. The <tt>examples/s6-rc</tt> subdirectory of
+the mdevd package shows a way to do this with the
+<a href="//skarnet.org/softwre/s6-rc/">s6-rc</a> service manager. </li>
 </ul>
 
 <h2> Configuration file </h2>

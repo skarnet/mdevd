@@ -3,7 +3,7 @@
 #
 
 src/mdevd/mdevd-coldplug.o src/mdevd/mdevd-coldplug.lo: src/mdevd/mdevd-coldplug.c
-src/mdevd/mdevd.o src/mdevd/mdevd.lo: src/mdevd/mdevd.c
+src/mdevd/mdevd.o src/mdevd/mdevd.lo: src/mdevd/mdevd.c src/include/mdevd/config.h
 
 mdevd: EXTRA_LIBS := -lskarnet ${MAYBEPTHREAD_LIB}
 mdevd: src/mdevd/mdevd.o ${LIBNSSS}
