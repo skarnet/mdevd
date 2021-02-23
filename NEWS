@@ -1,5 +1,12 @@
 Changelog for mdevd.
 
+In 0.1.4.0
+----------
+
+ - New +, - and & command prefixes accepted in mdev.conf, that run
+their command interpreted by execlineb instead of /bin/sh.
+
+
 In 0.1.3.0
 ----------
 

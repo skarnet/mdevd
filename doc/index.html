@@ -98,9 +98,13 @@ and does not pull in any unnecessary code. </li>
 The Linux kernel must be 2.6.10 or later. </li>
  <li> GNU make, version 3.81 or later </li>
  <li> <a href="//skarnet.org/software/skalibs/">skalibs</a> version
-2.10.0.0 or later. It's a build-time requirement. It's also a run-time
+2.10.0.2 or later. It's a build-time requirement. It's also a run-time
 requirement if you link against the shared version of the skalibs
 library. </li>
+ <li> Optionally: <a href="//skarnet.org/software/execline/">execline</a>
+version 2.8.0.0 or later. It's a only a run-time requirement, and only
+if your <tt>mdev.conf</tt> file contains <tt>+</tt>, <tt>-</tt> or
+<tt>&amp;</tt> command directives. </li>
 </ul>
 
 <h3> Licensing </h3>
@@ -114,7 +118,7 @@ library. </li>
 
 <ul>
  <li> The current released version of mdevd is
-<a href="mdevd-0.1.3.0.tar.gz">0.1.3.0</a>. </li>
+<a href="mdevd-0.1.4.0.tar.gz">0.1.4.0</a>. </li>
  <li> Alternatively, you can checkout a copy of the
 <a href="//git.skarnet.org/cgi-bin/cgit.cgi/mdevd/">mdevd
 git repository</a>:

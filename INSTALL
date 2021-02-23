@@ -6,7 +6,7 @@ Build Instructions
 
   - A Linux-based system with a standard C development environment
   - GNU make version 3.81 or later
-  - skalibs version 2.10.0.0 or later: https://skarnet.org/software/skalibs/
+  - skalibs version 2.10.0.2 or later: https://skarnet.org/software/skalibs/
 
  This software is Linux-specific. It will run on a Linux kernel,
 version 2.6.10 or later.
@@ -85,7 +85,7 @@ linking against the static libc with --enable-static-libc.
  Be aware that the GNU libc behaves badly with static linking and
 produces huge executables, which is why it is not the default.
 Other libcs are better suited to static linking, for instance
-musl: http://musl-libc.org/
+musl: https://musl-libc.org/
 
 
 * Cross-compilation

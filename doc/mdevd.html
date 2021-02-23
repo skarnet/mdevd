@@ -151,6 +151,34 @@ configuration where it can create device nodes as root or delete them, and does
 nothing else.
 </p>
 
+<h3> execline command support </h3>
+
+<p>
+ In addition to the traditional shell command spawning via the <tt>@</tt>,
+<tt>$</tt> and <tt>*</tt> directives, mdevd also supports spawning a command
+with the
+<a href="https://skarnet.org/software/execline/execlineb.html">execlineb</a>
+launcher:
+</p>
+
+<ul>
+ <li> <tt>+<em>cmd</em></tt>&nbsp;: spawns <tt>execlineb -Pc <em>cmd</em></tt>
+when this line catches an event that has <tt>ACTION=add</tt>. This is the
+equivalent of <tt>@<em>cmd</em></tt>. </li>
+ <li> <tt>-<em>cmd</em></tt>&nbsp;: spawns <tt>execlineb -Pc <em>cmd</em></tt>
+when this line catches an event that has <tt>ACTION=remove</tt>. This is the
+equivalent of <tt>$<em>cmd</em></tt>. </li>
+ <li> <tt>&amp;<em>cmd</em></tt>&nbsp;: spawns <tt>execlineb -Pc <em>cmd</em></tt>
+when this line catches an event no matter its action type. This is the
+equivalent of <tt>*<em>cmd</em></tt>. </li>
+</ul>
+
+<p>
+ Note that unlike <tt>/bin/sh</tt>, <tt>execlineb</tt> is spawned without an
+absolute path, so in order for <tt>+</tt>, <tt>-</tt> and <tt>&amp;</tt> to
+work, the <tt>execlineb</tt> command must be available in mdevd's PATH.
+</p>
+
 <h2> Notes </h2>
 
 <ul>
