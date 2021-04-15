@@ -63,9 +63,10 @@ by a supervision suite. </li>
 and <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/unsetenv.html">unsetenv()</a>)
 to store uevent data for each event. This implies repeated allocations of
 heap memory. By contrast, mdevd does not use its own environment - it
-actually does not use heap memory at all. All the memory it uses is
-committed (in the stack) at start time, and it will never grow during
-its lifetime. </li>
+only uses heap memory to compile its regular expressions, which only happens
+at start and when you reload its configuration file. All the rest of the
+memory it uses is committed in the stack, and it will never require more.
+mdevd cannot fail due to lack of memory while it is processing events. </li>
  <li> Better speed: <tt>mdev -d</tt> parses its config file for every
 event it receives, and has to perform expensive operations such as
 <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/getpwnam.html">getpwnam()</a>
