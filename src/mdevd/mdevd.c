@@ -537,7 +537,7 @@ static inline int wait_for_loading (char const *sysdevpath, size_t sysdevpathlen
     tain_add_g(&deadline, &period) ;
     deepsleepuntil_g(&deadline) ;
   }
-  if (ndelay_off(lfd) < 0)
+  if (lfd >= 0 && ndelay_off(lfd) < 0)
   {
     fd_close(lfd) ;
     return -1 ;
