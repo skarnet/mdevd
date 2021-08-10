@@ -524,14 +524,14 @@ static inline int wait_for_loading (char const *sysdevpath, size_t sysdevpathlen
 {
   int lfd = -1 ;
   unsigned int n = 150 ;
-  static tain_t const period = { .sec = TAI_ZERO, .nano = 200000000 } ;
+  static tain const period = { .sec = TAI_ZERO, .nano = 200000000 } ;
   char loadingfn[sysdevpathlen + 9] ;
   memcpy(loadingfn, sysdevpath, sysdevpathlen) ;
   memcpy(loadingfn + sysdevpathlen, "/loading", 9) ;
   tain_now_g() ;
   while (n--)  /* sysfs doesn't support inotify, so we have to poll -_- */
   {
-    tain_t deadline ;
+    tain deadline ;
     lfd = open_write(loadingfn) ;
     if (lfd >= 0) break ;
     tain_add_g(&deadline, &period) ;
@@ -1021,7 +1021,7 @@ int main (int argc, char const *const *argv)
   int docoldplug = 0 ;
   PROG = "mdevd" ;
   {
-    subgetopt_t l = SUBGETOPT_ZERO ;
+    subgetopt l = SUBGETOPT_ZERO ;
     for (;;)
     {
       int opt = subgetopt_r(argc, argv, "nv:D:o:b:f:s:d:F:C", &l) ;
@@ -1076,14 +1076,14 @@ int main (int argc, char const *const *argv)
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
   x[0].fd = selfpipe_init() ;
   if (x[0].fd < 0) strerr_diefu1sys(111, "init selfpipe") ;
-  if (sig_ignore(SIGPIPE) < 0) strerr_diefu1sys(111, "ignore SIGPIPE") ;
+  if (sig_altignore(SIGPIPE) < 0) strerr_diefu1sys(111, "ignore SIGPIPE") ;
   {
     sigset_t set ;
     sigemptyset(&set) ;
     sigaddset(&set, SIGTERM) ;
     sigaddset(&set, SIGCHLD) ;
     sigaddset(&set, SIGHUP) ;
-    if (selfpipe_trapset(&set) < 0)
+    if (!selfpipe_trapset(&set))
       strerr_diefu1sys(111, "trap signals") ;
   }
 

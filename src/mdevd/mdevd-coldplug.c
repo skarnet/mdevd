@@ -78,7 +78,7 @@ int main (int argc, char const *const *argv, char const *const *envp)
   char const *slashsys = "/sys" ;
   PROG = "mdevd-coldplug" ;
   {
-    subgetopt_t l = SUBGETOPT_ZERO ;
+    subgetopt l = SUBGETOPT_ZERO ;
     for (;;)
     {
       int opt = subgetopt_r(argc, argv, "s:", &l) ;
