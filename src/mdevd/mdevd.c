@@ -32,7 +32,6 @@
 #include <skalibs/sig.h>
 #include <skalibs/selfpipe.h>
 #include <skalibs/tai.h>
-#include <skalibs/environ.h>
 #include <skalibs/env.h>
 #include <skalibs/djbunix.h>
 #include <skalibs/iopause.h>
