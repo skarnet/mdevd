@@ -1075,7 +1075,7 @@ int main (int argc, char const *const *argv)
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
   x[0].fd = selfpipe_init() ;
   if (x[0].fd < 0) strerr_diefu1sys(111, "init selfpipe") ;
-  if (sig_altignore(SIGPIPE) < 0) strerr_diefu1sys(111, "ignore SIGPIPE") ;
+  if (!sig_altignore(SIGPIPE)) strerr_diefu1sys(111, "ignore SIGPIPE") ;
   {
     sigset_t set ;
     sigemptyset(&set) ;
