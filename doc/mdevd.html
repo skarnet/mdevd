@@ -49,7 +49,7 @@ to running mdevd over mdev. </li>
 <h2> Interface </h2>
 
 <pre>
-     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -o <em>outputfd</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ] [ -C ]
+     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -o <em>outputfd</em> ] [ -O <em>nlgroups</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ] [ -C ]
 </pre>
 
 <ul>
@@ -104,6 +104,11 @@ character. The uevent is terminated by an additional null character.
 If for any reason, at any point, mdevd fails to write to <em>outputfd</em>,
 it stops writing, until it is restarted. (This is to preserve mdevd's memory
 stability guarantee.) By default, the uevents are not written anywhere. </li>
+ <li> <tt>-O</tt>&nbsp;<em>nlgroups</em>&nbsp;: after mdevd has handled the
+uevents, rebroadcast them to the netlink groups identified by the mask
+<em>nlgroups</em>. Bit 0 of <em>nlgroups</em> is always ignored (because
+netlink group 1 is the one used by the kernel to send the original uevents and
+that mdevd listens to, and we don't want to loopback on it). </li>
  <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
 <em>kbufsz</em> bytes for the netlink queue. Too large a buffer wastes kernel memory;
 too small a buffer risks losing events. The default is 500 kB, which should be

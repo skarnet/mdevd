@@ -42,7 +42,7 @@
 
 #include <mdevd/config.h>
 
-#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
+#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -O nlgroups ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 #define CONFBUFSIZE 8192
@@ -56,7 +56,6 @@
 static int dryrun = 0 ;
 static int cont = 1 ;
 static pid_t pid = 0 ;
-static unsigned int outputfd = 0 ;
 static unsigned int verbosity = 1 ;
 static char const *slashsys = "/sys" ;
 static char const *fwbase = "/lib/firmware" ;
@@ -219,6 +218,19 @@ static inline int netlink_init (unsigned int kbufsz)
   return -1 ;
 }
 
+static inline int rebc_init (unsigned int groups)
+{
+  struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = groups & ~1U, .nl_pid = 0 } ;
+  int fd = socket_internal(AF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT, O_CLOEXEC) ;
+  if (fd == -1) return -1 ;
+  if (connect(fd, (struct sockaddr *)&nl, sizeof nl) == -1)
+  {
+    fd_close(fd) ;
+    return -1 ;
+  }
+  return fd ;
+}
+
 static inline size_t netlink_read (int fd, char *s)
 {
   struct sockaddr_nl nl;
@@ -288,6 +300,7 @@ static inline int uevent_read (int fd, struct uevent_s *event)
   }
   return 1 ;
 }
+
 
 
  /* mdev.conf parsing. See PARSING.txt for details. */
@@ -966,9 +979,9 @@ static inline int handle_signals (void)
     switch (c)
     {
       case -1 : strerr_diefu1sys(111, "selfpipe_read") ;
-      case SIGTERM :
-      case SIGHUP : cont = c == SIGHUP ;
       case 0 : return e ;
+      case SIGTERM : cont = 0 ; break ;
+      case SIGHUP : cont = 1 ; break ;
       case SIGCHLD :
         if (!pid) wait_reap() ;
         else
@@ -996,7 +1009,7 @@ static inline int handle_event (int fd, struct uevent_s *event, scriptelem const
   return 1 ;
 }
 
-static void output_event (struct uevent_s *event)
+static int output_event (unsigned int outputfd, struct uevent_s *event)
 {
   static char const c = 0 ;
   struct iovec v[2] = { { .iov_base = event->buf, .iov_len = event->len }, { .iov_base = (char *)&c, .iov_len = 1 } } ;
@@ -1005,9 +1018,16 @@ static void output_event (struct uevent_s *event)
     char fmt[UINT_FMT] ;
     fmt[uint_fmt(fmt, outputfd)] = 0 ;
     fd_close(outputfd) ;
-    outputfd = 0 ;
     strerr_warnwu3sys("write to descriptor ", fmt, " (closing it)") ;
+    return 0 ;
   }
+  return 1 ;
+}
+
+static void rebc_event (int fd, struct uevent_s const *event)
+{
+  if (fd_send(fd, event->buf, event->len, 0) == -1)
+    strerr_warnwu1sys("rebroadcast uevent") ;
 }
 
 int main (int argc, char const *const *argv)
@@ -1018,12 +1038,14 @@ int main (int argc, char const *const *argv)
   unsigned int kbufsz = 512288 ;
   char const *slashdev = "/dev" ;
   int docoldplug = 0 ;
+  unsigned int outputfd = 0 ;
+  unsigned int rebc = 0 ;
   PROG = "mdevd" ;
   {
     subgetopt l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "nv:D:o:b:f:s:d:F:C", &l) ;
+      int opt = subgetopt_r(argc, argv, "nv:D:o:O:b:f:s:d:F:C", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
@@ -1031,6 +1053,7 @@ int main (int argc, char const *const *argv)
         case 'v' : if (!uint0_scan(l.arg, &verbosity)) dieusage() ; break ;
         case 'D' : if (!uint0_scan(l.arg, &notif)) dieusage() ; break ;
         case 'o' : if (!uint0_scan(l.arg, &outputfd)) dieusage() ; break ;
+        case 'O' : if (!uint0_scan(l.arg, &rebc)) dieusage() ; break ;
         case 'b' : if (!uint0_scan(l.arg, &kbufsz)) dieusage() ; break ;
         case 'f' : configfile = l.arg ; break ;
         case 's' : slashsys = l.arg ; break ;
@@ -1063,7 +1086,6 @@ int main (int argc, char const *const *argv)
     if (ndelay_on(outputfd) < 0) strerr_diefu1sys(111, "set output fd non-blocking") ;
     if (coe(outputfd) < 0) strerr_diefu1sys(111, "set output fd close-on-exec") ;
   }
-
   {
     struct stat st ;
     if (stat("/", &st) < 0) strerr_diefu1sys(111, "stat /") ;
@@ -1073,6 +1095,13 @@ int main (int argc, char const *const *argv)
 
   x[1].fd = netlink_init(kbufsz) ;
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
+  if (rebc)
+  {
+    int fd = rebc_init(rebc) ;
+    if (fd == -1) strerr_diefu2sys(111, "init netlink", " rebroadcast socket") ;
+    rebc = fd ;
+  }
+
   x[0].fd = selfpipe_init() ;
   if (x[0].fd < 0) strerr_diefu1sys(111, "init selfpipe") ;
   if (!sig_altignore(SIGPIPE)) strerr_diefu1sys(111, "ignore SIGPIPE") ;
@@ -1133,11 +1162,17 @@ int main (int argc, char const *const *argv)
       {
         if (iopause_stamp(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ)
-          if (handle_signals() && outputfd)
-            output_event(&event) ;
+          if (handle_signals())
+          {
+            if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
+            if (rebc) rebc_event(rebc, &event) ;
+          }
         if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch) && !pid && outputfd)
-            output_event(&event) ;
+          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch) && !pid)
+          {
+            if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
+            if (rebc) rebc_event(rebc, &event) ;
+          }
       }
 
       script_free(script, scriptlen, envmatch, envmatchlen) ;
