@@ -52,6 +52,7 @@
 #define ACTION_NONE 0x0
 #define ACTION_ADD 0x1
 #define ACTION_REMOVE 0x2
+#define ACTION_ANY 0x3
 
 static int dryrun = 0 ;
 static int cont = 1 ;
@@ -823,7 +824,7 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     }
   }
 
-  if (action & elem->cmdtype)
+  if (elem->cmdtype == ACTION_ANY || action == elem->cmdtype)
   {
     if (!event_getvar(event, "MDEV"))
     {
@@ -952,7 +953,7 @@ static inline void on_event (struct uevent_s *event, scriptelem const *script, u
   if (!x) return ;
   if (!strcmp(x, "add")) action = ACTION_ADD ;
   else if (!strcmp(x, "remove")) action = ACTION_REMOVE ;
-  else return ;
+  else action = ACTION_ANY ;
   x = event_getvar(event, "DEVPATH") ;
   if (!x) return ;
   {

@@ -156,6 +156,12 @@ configuration where it can create device nodes as root or delete them, and does
 nothing else.
 </p>
 
+<p>
+ A semantic difference with <tt>mdev</tt> is that a <tt>*</tt> command will
+be run on <em>every</em> action type, not just <tt>ACTION=add</tt> and
+<tt>ACTION=remove</tt>.
+</p>
+
 <h3> execline command support </h3>
 
 <p>
@@ -174,8 +180,8 @@ equivalent of <tt>@<em>cmd</em></tt>. </li>
 when this line catches an event that has <tt>ACTION=remove</tt>. This is the
 equivalent of <tt>$<em>cmd</em></tt>. </li>
  <li> <tt>&amp;<em>cmd</em></tt>&nbsp;: spawns <tt>execlineb -Pc <em>cmd</em></tt>
-when this line catches an event no matter its action type. This is the
-equivalent of <tt>*<em>cmd</em></tt>. </li>
+when this line catches an event no matter its action type (<tt>add</tt>,
+<tt>remove</tt>, or anything else). This is the equivalent of <tt>*<em>cmd</em></tt>. </li>
 </ul>
 
 <p>
