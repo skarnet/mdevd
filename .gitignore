@@ -6,5 +6,4 @@
 /config.mak
 /src/include/mdevd/config.h
 /mdevd
-/mdevd-netlink
 /mdevd-coldplug
