@@ -37,8 +37,7 @@
 #include <skalibs/iopause.h>
 #include <skalibs/socket.h>
 #include <skalibs/skamisc.h>
-#include <skalibs/surf.h>
-#include <skalibs/random.h>
+#include <skalibs/unix-transactional.h>
 
 #include <mdevd/config.h>
 
@@ -60,7 +59,6 @@ static pid_t pid = 0 ;
 static unsigned int verbosity = 1 ;
 static char const *slashsys = "/sys" ;
 static char const *fwbase = "/lib/firmware" ;
-static SURFSchedule surf_ctx = SURFSCHEDULE_ZERO ;
 static unsigned int root_maj, root_min ;
 
 struct envmatch_s
@@ -145,20 +143,6 @@ static inline void script_free (scriptelem *script, unsigned short scriptlen, st
     if (script[i].devmatchtype == DEVMATCH_DEVRE)
       regfree(&script[i].devmatch.devre) ;
   for (i = 0 ; i < envmatchlen ; i++) regfree(&envmatch[i].re) ;
-}
-
-static inline void mdevd_random_init (void)
-{
-  char seed[160] ;
-  random_makeseed(seed) ;
-  surf_init(&surf_ctx, seed) ;
-}
-
-static inline void surfname (char *s, size_t n)
-{
-  static char const oklist[64] = "ABCDEFGHIJKLMNOPQRSTUVWXYZghijklmnopqrstuvwxyz-_0123456789abcdef" ;
-  surf(&surf_ctx, s, n) ;
-  while (n--) s[n] = oklist[s[n] & 63] ;
 }
 
 static inline int mkdirp (char *s)
@@ -793,33 +777,10 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     {
       if (!makesubdirs(devname)) return -1 ;
       if (dryrun) strerr_warni4x("dry run: symlink ", node, " to ", devname) ;
-      else if (symlink(node, devname) < 0)
+      else if (atomic_symlink(node, devname, "mdevd") < 0)
       {
-        if (errno != EEXIST)
-        {
-          if (verbosity)
-            strerr_warnwu4sys("symlink ", node, " to ", devname) ;
-          return -1 ;
-        }
-        else
-        {
-          char tmppath[devnamelen + 20] ;
-          memcpy(tmppath, devname, devnamelen) ;
-          memcpy(tmppath + devnamelen, ":mdevd-", 7) ;
-          surfname(tmppath + devnamelen + 7, 12) ;
-          tmppath[devnamelen + 19] = 0 ;
-          if (symlink(node, tmppath) < 0)
-          {
-            if (verbosity)
-              strerr_warnwu4sys("symlink ", node, " to ", tmppath) ;
-          }
-          else if (rename(tmppath, devname) < 0)
-          {
-            if (verbosity)
-              strerr_warnwu4sys("rename ", tmppath, " to ", devname) ;
-            unlink_void(tmppath) ;
-          }
-        }
+        if (verbosity) strerr_warnwu4sys("symlink ", node, " to ", devname) ;
+        return -1 ;
       }
     }
   }
@@ -1117,7 +1078,6 @@ int main (int argc, char const *const *argv)
   }
 
   tain_now_set_stopwatch_g() ;
-  mdevd_random_init() ;
   umask(0) ;
 
   while (cont)
