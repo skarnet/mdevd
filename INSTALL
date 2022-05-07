@@ -6,7 +6,8 @@ Build Instructions
 
   - A Linux-based system with a standard C development environment
   - GNU make version 3.81 or later
-  - skalibs version 2.11.1.0 or later: https://skarnet.org/software/skalibs/
+  - skalibs version 2.12.0.0 or later: https://skarnet.org/software/skalibs/
+  - optional: execline version 2.9.0.0 or later: https://skarnet.org/software/execline/
 
  This software is Linux-specific. It will run on a Linux kernel,
 version 2.6.10 or later.
