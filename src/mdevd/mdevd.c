@@ -133,6 +133,19 @@ struct uevent_s
 } ;
 #define UEVENT_ZERO { .len = 0, .varn = 0 }
 
+typedef struct udata_s udata, *udata_ref ;
+struct udata_s
+{
+  char *devname ;
+  mode_t devtype ;
+  unsigned int action ;
+  int mmaj ;
+  int mmin ;
+  unsigned int i ;
+  char buf[UEVENT_MAX_SIZE] ;
+} ;
+#define UDATA_ZERO { .devname = 0, .devtype = 0, .action = 0, .mmaj = -1, .mmin = -1, .i = 0, .buf = "" }
+
 
  /* Utility functions */
 
@@ -673,9 +686,9 @@ static inline void spawn_command (char const *command, struct uevent_s const *ev
   }
 }
 
-static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem, char const *storage, struct envmatch_s const *envmatch, char *devname, mode_t devtype, unsigned int action, int mmaj, int mmin)
+static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem, char const *storage, struct envmatch_s const *envmatch, udata const *ud)
 {
-  size_t devnamelen = strlen(devname) ;
+  size_t devnamelen = strlen(ud->devname) ;
   size_t nodelen = 0 ;
   char *node = event->buf + event->len + 5 ;
   regmatch_t off[10] ;
@@ -692,11 +705,11 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     case DEVMATCH_NOTHING:
     case DEVMATCH_CATCHALL: break ;
     case DEVMATCH_MAJMIN:
-      if (mmaj >= 0 && mmin >= 0 && mmaj == elem->devmatch.majmin.maj && mmin >= elem->devmatch.majmin.minlo && mmin <= elem->devmatch.majmin.minhi) break ;
+      if (ud->mmaj >= 0 && ud->mmin >= 0 && ud->mmaj == elem->devmatch.majmin.maj && ud->mmin >= elem->devmatch.majmin.minlo && ud->mmin <= elem->devmatch.majmin.minhi) break ;
       return 0 ;
     case DEVMATCH_DEVRE:
-      if (!regexec(&elem->devmatch.devre, devname, 10, off, 0)
-       && !off[0].rm_so && off[0].rm_eo == strlen(devname))
+      if (!regexec(&elem->devmatch.devre, ud->devname, 10, off, 0)
+       && !off[0].rm_so && off[0].rm_eo == strlen(ud->devname))
         break ;
       return 0 ;
   }
@@ -705,16 +718,16 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
   {
     case MOVEINFO_NOTHING :
     case MOVEINFO_NOCREATE :
-      memcpy(node, devname, devnamelen + 1) ;
+      memcpy(node, ud->devname, devnamelen + 1) ;
       nodelen = devnamelen ;
       break ;
     case MOVEINFO_MOVE :
     case MOVEINFO_MOVEANDLINK :
     {
-      ssize_t r = alias_format(node, PATH_MAX, storage + elem->movepath, devname, off) ;
+      ssize_t r = alias_format(node, PATH_MAX, storage + elem->movepath, ud->devname, off) ;
       if (r <= 1)
       {
-        if (verbosity) strerr_warnwu5sys("process expression \"", storage + elem->movepath, "\" with devname \"", devname, "\"") ;
+        if (verbosity) strerr_warnwu5sys("process expression \"", storage + elem->movepath, "\" with devname \"", ud->devname, "\"") ;
         return -1 ;
       }
       if (node[r - 2] == '/')
@@ -722,16 +735,16 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
         if (r + devnamelen >= PATH_MAX)
         {
           errno = ENAMETOOLONG ;
-          if (verbosity) strerr_warnwu2sys("create alias for ", devname) ;
+          if (verbosity) strerr_warnwu2sys("create alias for ", ud->devname) ;
           return -1 ;
         }
-        memcpy(node + r - 1, devname, devnamelen + 1) ;
+        memcpy(node + r - 1, ud->devname, devnamelen + 1) ;
         nodelen = r + devnamelen - 1 ;
       }
       break ;
     }
   }
-  if (elem->movetype != MOVEINFO_NOCREATE && action == ACTION_ADD && mmaj >= 0)
+  if (elem->movetype != MOVEINFO_NOCREATE && ud->action == ACTION_ADD && ud->mmaj >= 0)
   {
     if (!makesubdirs(node)) return -1 ;
     if (dryrun)
@@ -739,13 +752,13 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
       char fmtmaj[UINT_FMT] ;
       char fmtmin[UINT_FMT] ;
       char fmtmode[UINT_OFMT] ;
-      fmtmaj[uint_fmt(fmtmaj, mmaj)] = 0 ;
-      fmtmin[uint_fmt(fmtmin, mmin)] = 0 ;
+      fmtmaj[uint_fmt(fmtmaj, ud->mmaj)] = 0 ;
+      fmtmin[uint_fmt(fmtmin, ud->mmin)] = 0 ;
       fmtmode[uint_ofmt(fmtmode, elem->mode)] = 0 ;
-      strerr_warni6x("dry run: mknod ", node, S_ISBLK(devtype) ? " b " : " c ", fmtmaj, " ", fmtmin) ;
+      strerr_warni6x("dry run: mknod ", node, S_ISBLK(ud->devtype) ? " b " : " c ", fmtmaj, " ", fmtmin) ;
       strerr_warni4x("dry run: chmod ", fmtmode, " ", node) ;
     }
-    else if (mknod(node, elem->mode | devtype, makedev(mmaj, mmin)) < 0)
+    else if (mknod(node, elem->mode | ud->devtype, makedev(ud->mmaj, ud->mmin)) < 0)
     {
       if (errno != EEXIST)
       {
@@ -768,24 +781,24 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
       else if (chown(node, elem->uid, elem->gid) < 0 && verbosity >= 2)
         strerr_warnwu2sys("chown ", node) ;
     }
-    if (mmaj == root_maj && mmin == root_min)
+    if (ud->mmaj == root_maj && ud->mmin == root_min)
     {
       if (dryrun) strerr_warni3x("dry run: symlink ", node, " to root") ;
       else symlink(node, "root") ;
     }
     if (elem->movetype == MOVEINFO_MOVEANDLINK)
     {
-      if (!makesubdirs(devname)) return -1 ;
-      if (dryrun) strerr_warni4x("dry run: symlink ", node, " to ", devname) ;
-      else if (atomic_symlink(node, devname, "mdevd") < 0)
+      if (!makesubdirs(ud->devname)) return -1 ;
+      if (dryrun) strerr_warni4x("dry run: symlink ", node, " to ", ud->devname) ;
+      else if (atomic_symlink(node, ud->devname, "mdevd") < 0)
       {
-        if (verbosity) strerr_warnwu4sys("symlink ", node, " to ", devname) ;
+        if (verbosity) strerr_warnwu4sys("symlink ", node, " to ", ud->devname) ;
         return -1 ;
       }
     }
   }
 
-  if (elem->cmdtype == ACTION_ANY || action == elem->cmdtype)
+  if (elem->cmdtype == ACTION_ANY || ud->action == elem->cmdtype)
   {
     if (!event_getvar(event, "MDEV"))
     {
@@ -815,39 +828,33 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     else spawn_command(storage + elem->command, event, elem->flagexecline) ;
   }
 
-  if (elem->movetype != MOVEINFO_NOCREATE && action == ACTION_REMOVE && mmaj >= 0)
+  if (elem->movetype != MOVEINFO_NOCREATE && ud->action == ACTION_REMOVE && ud->mmaj >= 0)
   {
     if (elem->movetype == MOVEINFO_MOVEANDLINK)
     {
-      if (dryrun) strerr_warni2x("dry run: unlink ", devname) ;
-      else unlink_void(devname) ;
+      if (dryrun) strerr_warni2x("dry run: unlink ", ud->devname) ;
+      else unlink_void(ud->devname) ;
     }
     if (dryrun) strerr_warni2x("dry run: unlink ", node) ;
     else unlink_void(node) ;
   }
 
-  return !elem->flagcont ;  
+  return pid || !elem->flagcont ;
 }
 
-static inline void run_script (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, char *devname, mode_t devtype, unsigned int action, int mmaj, int mmin)
+static inline void run_script (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
-  unsigned short i = 0 ;
-  for (; i < scriptlen ; i++)
-  {
-    int r ;
-    r = run_scriptelem(event, script + i, storage, envmatch, devname, devtype, action, mmaj, mmin) ;
-    if (r) break ;
-  }
+  while (ud->i < scriptlen)
+    if (run_scriptelem(event, script + ud->i++, storage, envmatch, ud)) break ;
 }
 
-static inline void act_on_event (struct uevent_s *event, char *sysdevpath, size_t sysdevpathlen, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
+static inline void act_on_event (struct uevent_s *event, char *sysdevpath, size_t sysdevpathlen, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   ssize_t hasmajmin = 0 ;
   unsigned int mmaj, mmin ;
-  mode_t devtype = S_IFCHR ;
-  char *devname ;
   char const *x = event_getvar(event, "MAJOR") ;
-  char buf[UEVENT_MAX_SIZE] ;
+  ud->devtype = S_IFCHR ;
+  ud->action = action ;
   if (action == ACTION_ADD)
   {
     if (x && uint0_scan(x, &mmaj))
@@ -858,56 +865,59 @@ static inline void act_on_event (struct uevent_s *event, char *sysdevpath, size_
     if (!hasmajmin)
     {
       memcpy(sysdevpath + sysdevpathlen, "/dev", 5) ;
-      hasmajmin = openreadnclose(sysdevpath, buf, UINT_FMT << 1) ;
+      hasmajmin = openreadnclose(sysdevpath, ud->buf, UINT_FMT << 1) ;
       sysdevpath[sysdevpathlen] = 0 ;
       if (hasmajmin > 0)
       {
-        size_t i = uint_scan(buf, &mmaj) ;
-        if (i > 0 && buf[i] == ':')
+        size_t i = uint_scan(ud->buf, &mmaj) ;
+        if (i > 0 && ud->buf[i] == ':')
         {
-          size_t j = uint_scan(buf + i + 1, &mmin) ;
-          if (j > 0 && buf[i+1+j] == '\n') ;
+          size_t j = uint_scan(ud->buf + i + 1, &mmin) ;
+          if (j > 0 && ud->buf[i+1+j] == '\n') ;
           else hasmajmin = 0 ;
         }
         else hasmajmin = 0 ;
       }
     }
   }
+  ud->mmaj = hasmajmin > 0 ? mmaj : -1 ;
+  ud->mmin = hasmajmin > 0 ? mmin : -1 ;
 
-  devname = event_getvar(event, "DEVNAME") ;
-  if (!devname)
+  ud->devname = event_getvar(event, "DEVNAME") ;
+  if (!ud->devname)
   {
     ssize_t r ;
     memcpy(sysdevpath + sysdevpathlen, "/uevent", 8) ;
-    r = openreadnclose(sysdevpath, buf, UEVENT_MAX_SIZE-1) ;
+    r = openreadnclose(sysdevpath, ud->buf, UEVENT_MAX_SIZE-1) ;
     sysdevpath[sysdevpathlen] = 0 ;
     if (r > 0)
     {
-      buf[r] = 0 ;
-      devname = strstr(buf, "\nDEVNAME=") ;
-      if (devname)
+      ud->buf[r] = 0 ;
+      ud->devname = strstr(ud->buf, "\nDEVNAME=") ;
+      if (ud->devname)
       {
-        devname += 9 ;
-        *strchr(devname, '\n') = 0 ;
+        ud->devname += 9 ;
+        *strchr(ud->devname, '\n') = 0 ;
       }
     }
-    if (!devname) devname = basename(sysdevpath) ;
+    if (!ud->devname) ud->devname = basename(sysdevpath) ;
   }
-  if (strlen(devname) >= PATH_MAX - 1)
+  if (strlen(ud->devname) >= PATH_MAX - 1)
   {
-    if (verbosity) strerr_warnwu2x("device name too long: ", devname) ;
+    if (verbosity) strerr_warnwu2x("device name too long: ", ud->devname) ;
     return ;
   }
-  if (strstr(sysdevpath, "/block/")) devtype = S_IFBLK ;
+  if (strstr(sysdevpath, "/block/")) ud->devtype = S_IFBLK ;
   else
   {
     x = event_getvar(event, "SUBSYSTEM") ;
-    if (x && str_start(x, "block")) devtype = S_IFBLK ;
+    if (x && str_start(x, "block")) ud->devtype = S_IFBLK ;
   }
-  run_script(event, script, scriptlen, storage, envmatch, devname, devtype, action, hasmajmin > 0 ? mmaj : -1, hasmajmin > 0 ? mmin : -1) ;
+  ud->i = 0 ;
+  run_script(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
-static inline void on_event (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
+static inline void on_event (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   unsigned int action ;
   char const *x = event_getvar(event, "ACTION") ;
@@ -924,7 +934,7 @@ static inline void on_event (struct uevent_s *event, scriptelem const *script, u
     memcpy(sysdevpath, slashsys, slashsyslen) ;
     memcpy(sysdevpath + slashsyslen, x, devpathlen + 1) ;
     x = event_getvar(event, "FIRMWARE") ;
-    if (action == ACTION_ADD || !x) act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch) ;
+    if (action == ACTION_ADD || !x) act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch, ud) ;
     if (action == ACTION_ADD && x) load_firmware(x, sysdevpath) ;
   }
 }
@@ -932,7 +942,7 @@ static inline void on_event (struct uevent_s *event, scriptelem const *script, u
 
  /* Tying it all together */
 
-static inline int handle_signals (void)
+static inline int handle_signals (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   int e = 0 ;
   for (;;)
@@ -956,6 +966,7 @@ static inline int handle_signals (void)
           else if (!r) break ;
           pid = 0 ;
           e = 1 ;
+          run_script(event, script, scriptlen, storage, envmatch, ud) ;
         }
         break ;
       default :
@@ -964,10 +975,10 @@ static inline int handle_signals (void)
   }
 }
 
-static inline int handle_event (int fd, struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch)
+static inline int handle_event (int fd, struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   if (!uevent_read(fd, event) || event->varn <= 1) return 0 ;
-    on_event(event, script, scriptlen, storage, envmatch) ;
+    on_event(event, script, scriptlen, storage, envmatch, ud) ;
   return 1 ;
 }
 
@@ -1098,6 +1109,7 @@ int main (int argc, char const *const *argv)
 
     {
       struct uevent_s event = UEVENT_ZERO ;
+      udata ud = UDATA_ZERO ;
       struct envmatch_s envmatch[envmatchlen ? envmatchlen : 1] ;
       scriptelem script[scriptlen + 1] ;
       memset(script, 0, scriptlen * sizeof(scriptelem)) ;
@@ -1123,13 +1135,13 @@ int main (int argc, char const *const *argv)
       {
         if (iopause_stamp(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ)
-          if (handle_signals())
+          if (handle_signals(&event, script, scriptlen, storage, envmatch, &ud) && !pid)
           {
             if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
             if (rebc) rebc_event(rebc, &event) ;
           }
         if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch) && !pid)
+          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud) && !pid)
           {
             if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
             if (rebc) rebc_event(rebc, &event) ;
