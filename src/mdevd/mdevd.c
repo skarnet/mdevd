@@ -55,7 +55,6 @@
 
 static int dryrun = 0 ;
 static int cont = 1 ;
-static pid_t pid = 0 ;
 static unsigned int verbosity = 1 ;
 static char const *slashsys = "/sys" ;
 static char const *fwbase = "/lib/firmware" ;
@@ -141,10 +140,12 @@ struct udata_s
   unsigned int action ;
   int mmaj ;
   int mmin ;
+  pid_t pid ;
   unsigned int i ;
   char buf[UEVENT_MAX_SIZE] ;
+  unsigned char done : 1 ;
 } ;
-#define UDATA_ZERO { .devname = 0, .devtype = 0, .action = 0, .mmaj = -1, .mmin = -1, .i = 0, .buf = "" }
+#define UDATA_ZERO { .devname = 0, .devtype = 0, .action = 0, .mmaj = -1, .mmin = -1, .pid = 0, .i = 0, .buf = "", .done = 0 }
 
 
  /* Utility functions */
@@ -298,7 +299,6 @@ static inline int uevent_read (int fd, struct uevent_s *event)
   }
   return 1 ;
 }
-
 
 
  /* mdev.conf parsing. See PARSING.txt for details. */
@@ -669,7 +669,7 @@ static inline ssize_t alias_format (char *out, size_t outmax, char const *in, ch
   return w ;
 }
 
-static inline void spawn_command (char const *command, struct uevent_s const *event, int isel)
+static inline void spawn_command (char const *command, struct uevent_s const *event, int isel, udata *ud)
 {
   char const *argv[4] = { isel ? "execlineb" : "/bin/sh", isel ? "-Pc" : "-c", command, 0 } ;
   size_t envlen = env_len((char const **)environ) ;
@@ -679,14 +679,14 @@ static inline void spawn_command (char const *command, struct uevent_s const *ev
     if (verbosity) strerr_warnwu1sys("merge environment to spawn command") ;
     return ;
   }
-  pid = child_spawn0(argv[0], argv, envp) ;
-  if (!pid)
+  ud->pid = child_spawn0(argv[0], argv, envp) ;
+  if (!ud->pid)
   {
     if (verbosity) strerr_warnwu2sys("spawn ", argv[0]) ;
   }
 }
 
-static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem, char const *storage, struct envmatch_s const *envmatch, udata const *ud)
+static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   size_t devnamelen = strlen(ud->devname) ;
   size_t nodelen = 0 ;
@@ -825,7 +825,7 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
         strerr_warni2x("dry run: added variables: ", buf) ;
       }
     }
-    else spawn_command(storage + elem->command, event, elem->flagexecline) ;
+    else spawn_command(storage + elem->command, event, elem->flagexecline, ud) ;
   }
 
   if (elem->movetype != MOVEINFO_NOCREATE && ud->action == ACTION_REMOVE && ud->mmaj >= 0)
@@ -839,16 +839,18 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     else unlink_void(node) ;
   }
 
-  return pid || !elem->flagcont ;
+  ud->done = !elem->flagcont ;
+  return ud->done || !!ud->pid ;
 }
 
-static inline void run_script (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static int run_script (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
-  while (ud->i < scriptlen)
-    if (run_scriptelem(event, script + ud->i++, storage, envmatch, ud)) break ;
+  for (;; ud->i++)  /* last elem is the catchall with flagcont=0 */
+    if (run_scriptelem(event, script + ud->i, storage, envmatch, ud)) break ;
+  return ud->done && !ud->pid ;
 }
 
-static inline void act_on_event (struct uevent_s *event, char *sysdevpath, size_t sysdevpathlen, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t sysdevpathlen, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   ssize_t hasmajmin = 0 ;
   unsigned int mmaj, mmin ;
@@ -905,7 +907,7 @@ static inline void act_on_event (struct uevent_s *event, char *sysdevpath, size_
   if (strlen(ud->devname) >= PATH_MAX - 1)
   {
     if (verbosity) strerr_warnwu2x("device name too long: ", ud->devname) ;
-    return ;
+    return 1 ;
   }
   if (strstr(sysdevpath, "/block/")) ud->devtype = S_IFBLK ;
   else
@@ -914,28 +916,31 @@ static inline void act_on_event (struct uevent_s *event, char *sysdevpath, size_
     if (x && str_start(x, "block")) ud->devtype = S_IFBLK ;
   }
   ud->i = 0 ;
-  run_script(event, script, scriptlen, storage, envmatch, ud) ;
+  ud->done = 0 ;
+  return run_script(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
-static inline void on_event (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static inline int on_event (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   unsigned int action ;
   char const *x = event_getvar(event, "ACTION") ;
-  if (!x) return ;
+  if (!x) return 1 ;
   if (!strcmp(x, "add")) action = ACTION_ADD ;
   else if (!strcmp(x, "remove")) action = ACTION_REMOVE ;
   else action = ACTION_ANY ;
   x = event_getvar(event, "DEVPATH") ;
-  if (!x) return ;
+  if (!x) return 1 ;
   {
+    int done = 1 ;
     size_t devpathlen = strlen(x) ;
     size_t slashsyslen = strlen(slashsys) ;
     char sysdevpath[devpathlen + slashsyslen + 8] ; /* act_on_event needs the extra storage */
     memcpy(sysdevpath, slashsys, slashsyslen) ;
     memcpy(sysdevpath + slashsyslen, x, devpathlen + 1) ;
     x = event_getvar(event, "FIRMWARE") ;
-    if (action == ACTION_ADD || !x) act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch, ud) ;
+    if (action == ACTION_ADD || !x) done = act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch, ud) ;
     if (action == ACTION_ADD && x) load_firmware(x, sysdevpath) ;
+    return done ;
   }
 }
 
@@ -955,18 +960,17 @@ static inline int handle_signals (struct uevent_s *event, scriptelem const *scri
       case SIGTERM : cont = 0 ; break ;
       case SIGHUP : cont = 1 ; break ;
       case SIGCHLD :
-        if (!pid) wait_reap() ;
+        if (!ud->pid) wait_reap() ;
         else
         {
           int wstat ;
-          int r = wait_pid_nohang(pid, &wstat) ;
+          int r = wait_pid_nohang(ud->pid, &wstat) ;
           if (r < 0)
             if (errno != ECHILD) strerr_diefu1sys(111, "wait_pid_nohang") ;
             else break ;
           else if (!r) break ;
-          pid = 0 ;
-          e = 1 ;
-          run_script(event, script, scriptlen, storage, envmatch, ud) ;
+          ud->pid = 0 ;
+          e = ud->done ? 1 : run_script(event, script, scriptlen, storage, envmatch, ud) ;
         }
         break ;
       default :
@@ -978,8 +982,7 @@ static inline int handle_signals (struct uevent_s *event, scriptelem const *scri
 static inline int handle_event (int fd, struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   if (!uevent_read(fd, event) || event->varn <= 1) return 0 ;
-    on_event(event, script, scriptlen, storage, envmatch, ud) ;
-  return 1 ;
+  return on_event(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
 static int output_event (unsigned int outputfd, struct uevent_s *event)
@@ -1131,17 +1134,17 @@ int main (int argc, char const *const *argv)
         notif = 0 ;
       }
 
-      while (pid || cont == 2)
+      while (ud.pid || cont == 2)
       {
-        if (iopause_stamp(x, 1 + (!pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
+        if (iopause_stamp(x, 1 + (!ud.pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ)
-          if (handle_signals(&event, script, scriptlen, storage, envmatch, &ud) && !pid)
+          if (handle_signals(&event, script, scriptlen, storage, envmatch, &ud))
           {
             if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
             if (rebc) rebc_event(rebc, &event) ;
           }
-        if (!pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud) && !pid)
+        if (!ud.pid && cont == 2 && x[1].revents & IOPAUSE_READ)
+          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud))
           {
             if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
             if (rebc) rebc_event(rebc, &event) ;
