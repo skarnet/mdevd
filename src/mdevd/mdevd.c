@@ -141,11 +141,10 @@ struct udata_s
   int mmaj ;
   int mmin ;
   pid_t pid ;
-  unsigned int i ;
+  unsigned short i ;
   char buf[UEVENT_MAX_SIZE] ;
-  unsigned char done : 1 ;
 } ;
-#define UDATA_ZERO { .devname = 0, .devtype = 0, .action = 0, .mmaj = -1, .mmin = -1, .pid = 0, .i = 0, .buf = "", .done = 0 }
+#define UDATA_ZERO { .devname = 0, .devtype = 0, .action = 0, .mmaj = -1, .mmin = -1, .pid = 0, .i = 0, .buf = "" }
 
 
  /* Utility functions */
@@ -839,15 +838,14 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     else unlink_void(node) ;
   }
 
-  ud->done = !elem->flagcont ;
-  return ud->done || !!ud->pid ;
+  return !elem->flagcont ;
 }
 
 static int run_script (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
-  for (;; ud->i++)  /* last elem is the catchall with flagcont=0 */
-    if (run_scriptelem(event, script + ud->i, storage, envmatch, ud)) break ;
-  return ud->done && !ud->pid ;
+  for (; ud->i < scriptlen && !ud->pid ; ud->i++)
+    if (run_scriptelem(event, script + ud->i, storage, envmatch, ud)) ud->i = scriptlen - 1 ;
+  return ud->i >= scriptlen && !ud->pid ;
 }
 
 static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t sysdevpathlen, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
@@ -916,7 +914,6 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
     if (x && str_start(x, "block")) ud->devtype = S_IFBLK ;
   }
   ud->i = 0 ;
-  ud->done = 0 ;
   return run_script(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
@@ -970,7 +967,7 @@ static inline int handle_signals (struct uevent_s *event, scriptelem const *scri
             else break ;
           else if (!r) break ;
           ud->pid = 0 ;
-          e = ud->done ? 1 : run_script(event, script, scriptlen, storage, envmatch, ud) ;
+          e = run_script(event, script, scriptlen, storage, envmatch, ud) ;
         }
         break ;
       default :
