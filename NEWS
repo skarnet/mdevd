@@ -1,5 +1,11 @@
 Changelog for mdevd.
 
+In 0.1.6.0
+----------
+
+ - mdevd-coldplug can now be synchronous with the -O option.
+
+
 In 0.1.5.2
 ----------
 

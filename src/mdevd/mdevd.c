@@ -40,6 +40,7 @@
 #include <skalibs/unix-transactional.h>
 
 #include <mdevd/config.h>
+#include "mdevd-internal.h"
 
 #define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -O nlgroups ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
 #define dieusage() strerr_dieusage(100, USAGE)
@@ -123,15 +124,6 @@ static scriptelem const scriptelem_catchall =
   .envmatchs = 0
 } ;
 
-struct uevent_s
-{
-  unsigned short len ;
-  unsigned short varn ;
-  unsigned short vars[UEVENT_MAX_VARS + 1] ;
-  char buf[UEVENT_MAX_SIZE + PATH_MAX + 5] ;
-} ;
-#define UEVENT_ZERO { .len = 0, .varn = 0 }
-
 typedef struct udata_s udata, *udata_ref ;
 struct udata_s
 {
@@ -188,34 +180,6 @@ static int makesubdirs (char *path)
 }
 
 
- /* Netlink isolation layer */
-
-static inline ssize_t fd_recvmsg (int fd, struct msghdr *hdr)
-{
-  ssize_t r ;
-  do r = recvmsg(fd, hdr, MSG_DONTWAIT) ;
-  while ((r == -1) && (errno == EINTR)) ;
-  return r ;
-}
-
-static inline int netlink_init (unsigned int kbufsz)
-{
-  struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = 1, .nl_pid = 0 } ;
-  int fd = socket_internal(AF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT, O_NONBLOCK|O_CLOEXEC) ;
-  if (fd < 0) return -1 ;
-  if (bind(fd, (struct sockaddr *)&nl, sizeof(struct sockaddr_nl)) < 0) goto err ;
-  if (setsockopt(fd, SOL_SOCKET, SO_RCVBUFFORCE, &kbufsz, sizeof(unsigned int)) < 0)
-  {
-    if (errno != EPERM
-     || setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &kbufsz, sizeof(unsigned int)) < 0) goto err ;
-  }
-  return fd ;
-
- err:
-  fd_close(fd) ;
-  return -1 ;
-}
-
 static inline int rebc_init (unsigned int groups)
 {
   struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = groups & ~1U, .nl_pid = 0 } ;
@@ -227,76 +191,6 @@ static inline int rebc_init (unsigned int groups)
     return -1 ;
   }
   return fd ;
-}
-
-static inline size_t netlink_read (int fd, char *s)
-{
-  struct sockaddr_nl nl;
-  struct iovec v = { .iov_base = s, .iov_len = UEVENT_MAX_SIZE } ;
-  struct msghdr msg =
-  {
-    .msg_name = &nl,
-    .msg_namelen = sizeof(struct sockaddr_nl),
-    .msg_iov = &v,
-    .msg_iovlen = 1,
-    .msg_control = 0,
-    .msg_controllen = 0,
-    .msg_flags = 0
-  } ;
-  ssize_t r = sanitize_read(fd_recvmsg(fd, &msg)) ;
-  if (r < 0)
-  {
-    if (errno == EPIPE)
-    {
-      if (verbosity >= 2) strerr_warnw1x("received EOF on netlink") ;
-      cont = 0 ;
-      return 0 ;
-    }
-    else strerr_diefu1sys(111, "receive netlink message") ;
-  }
-  if (!r) return 0 ;
-  if (msg.msg_flags & MSG_TRUNC)
-    strerr_diefu1x(111, "buffer too small for netlink message") ;
-  if (nl.nl_pid)
-  {
-    if (verbosity >= 3)
-    {
-      char fmt[PID_FMT] ;
-      fmt[pid_fmt(fmt, nl.nl_pid)] = 0 ;
-      strerr_warnw2x("received netlink message from userspace process ", fmt) ;
-    }
-    return 0 ;
-  }
-  if (s[r-1])
-  {
-    if (verbosity) strerr_warnw2x("received invalid event: ", "improperly terminated") ;
-    return 0 ;
-  }
-  if (!strstr(s, "@/"))
-  {
-    if (verbosity) strerr_warnw2x("received invalid event: ", "bad initial summary") ;
-    return 0 ;
-  }
-  return r ;
-}
-
-static inline int uevent_read (int fd, struct uevent_s *event)
-{
-  unsigned short len = 0 ;
-  event->len = netlink_read(fd, event->buf) ;
-  if (!event->len) return 0 ;
-  event->varn = 0 ;
-  while (len < event->len)
-  {
-    if (event->varn >= UEVENT_MAX_VARS)
-    {
-      if (verbosity) strerr_warnw2x("received invalid event: ", "too many variables") ;
-      return 0 ;
-    }
-    event->vars[event->varn++] = len ;
-    len += strlen(event->buf + len) + 1 ;
-  }
-  return 1 ;
 }
 
 
@@ -623,16 +517,6 @@ static inline void load_firmware (char const *fw, char const *sysdevpath)
 
  /* uevent management */
 
-static char *event_getvar (struct uevent_s *event, char const *var)
-{
-  size_t varlen = strlen(var) ;
-  unsigned short i = 1 ;
-  for (; i < event->varn ; i++)
-    if (!strncmp(var, event->buf + event->vars[i], varlen) && event->buf[event->vars[i] + varlen] == '=')
-      break ;
-  return i < event->varn ? event->buf + event->vars[i] + varlen + 1 : 0 ;
-}
-
 static inline unsigned char format_cclass (char c)
 {
   static unsigned char const classtable[58] = "0333333333333333333333333333333333333133333333332222222222" ;
@@ -694,7 +578,7 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
   unsigned short i = 0 ;
   for (; i < elem->envmatchlen ; i++)
   {
-    char const *x = event_getvar(event, storage + envmatch[elem->envmatchs + i].var) ;
+    char const *x = mdevd_uevent_getvar(event, storage + envmatch[elem->envmatchs + i].var) ;
     if (!x) return 0 ;
     if (regexec(&envmatch[elem->envmatchs + i].re, x, 0, 0, 0)) return 0 ;
   }
@@ -799,7 +683,7 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
 
   if (elem->cmdtype == ACTION_ANY || ud->action == elem->cmdtype)
   {
-    if (!event_getvar(event, "MDEV"))
+    if (!mdevd_uevent_getvar(event, "MDEV"))
     {
       event->vars[event->varn++] = event->len ;
       memcpy(event->buf + event->len, "MDEV=", 5) ;
@@ -852,14 +736,14 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
 {
   ssize_t hasmajmin = 0 ;
   unsigned int mmaj, mmin ;
-  char const *x = event_getvar(event, "MAJOR") ;
+  char const *x = mdevd_uevent_getvar(event, "MAJOR") ;
   ud->devtype = S_IFCHR ;
   ud->action = action ;
   if (action == ACTION_ADD)
   {
     if (x && uint0_scan(x, &mmaj))
     {
-      x = event_getvar(event, "MINOR") ;
+      x = mdevd_uevent_getvar(event, "MINOR") ;
       if (x && uint0_scan(x, &mmin)) hasmajmin = 1 ;
     }
     if (!hasmajmin)
@@ -883,7 +767,7 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
   ud->mmaj = hasmajmin > 0 ? mmaj : -1 ;
   ud->mmin = hasmajmin > 0 ? mmin : -1 ;
 
-  ud->devname = event_getvar(event, "DEVNAME") ;
+  ud->devname = mdevd_uevent_getvar(event, "DEVNAME") ;
   if (!ud->devname)
   {
     ssize_t r ;
@@ -910,7 +794,7 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
   if (strstr(sysdevpath, "/block/")) ud->devtype = S_IFBLK ;
   else
   {
-    x = event_getvar(event, "SUBSYSTEM") ;
+    x = mdevd_uevent_getvar(event, "SUBSYSTEM") ;
     if (x && str_start(x, "block")) ud->devtype = S_IFBLK ;
   }
   ud->i = 0 ;
@@ -920,12 +804,12 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
 static inline int on_event (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   unsigned int action ;
-  char const *x = event_getvar(event, "ACTION") ;
+  char const *x = mdevd_uevent_getvar(event, "ACTION") ;
   if (!x) return 1 ;
   if (!strcmp(x, "add")) action = ACTION_ADD ;
   else if (!strcmp(x, "remove")) action = ACTION_REMOVE ;
   else action = ACTION_ANY ;
-  x = event_getvar(event, "DEVPATH") ;
+  x = mdevd_uevent_getvar(event, "DEVPATH") ;
   if (!x) return 1 ;
   {
     int done = 1 ;
@@ -934,7 +818,7 @@ static inline int on_event (struct uevent_s *event, scriptelem const *script, un
     char sysdevpath[devpathlen + slashsyslen + 8] ; /* act_on_event needs the extra storage */
     memcpy(sysdevpath, slashsys, slashsyslen) ;
     memcpy(sysdevpath + slashsyslen, x, devpathlen + 1) ;
-    x = event_getvar(event, "FIRMWARE") ;
+    x = mdevd_uevent_getvar(event, "FIRMWARE") ;
     if (action == ACTION_ADD || !x) done = act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch, ud) ;
     if (action == ACTION_ADD && x) load_firmware(x, sysdevpath) ;
     return done ;
@@ -978,7 +862,7 @@ static inline int handle_signals (struct uevent_s *event, scriptelem const *scri
 
 static inline int handle_event (int fd, struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
-  if (!uevent_read(fd, event) || event->varn <= 1) return 0 ;
+  if (!mdevd_uevent_read(fd, event, verbosity) || event->varn <= 1) return 0 ;
   return on_event(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
@@ -1066,7 +950,7 @@ int main (int argc, char const *const *argv)
     root_min = minor(st.st_dev) ;
   }
 
-  x[1].fd = netlink_init(kbufsz) ;
+  x[1].fd = mdevd_netlink_init(1, kbufsz) ;
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
   if (rebc)
   {

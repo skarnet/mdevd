@@ -5,23 +5,35 @@
 #include <string.h>
 #include <unistd.h>
 #include <errno.h>
+#include <limits.h>
+
 #include <skalibs/sgetopt.h>
+#include <skalibs/types.h>
 #include <skalibs/strerr2.h>
 #include <skalibs/direntry.h>
+#include <skalibs/djbunix.h>
 
-#define USAGE "mdevd-coldplug [ -s slashsys ]"
+#include "mdevd-internal.h"
+
+#define USAGE "mdevd-coldplug [ -v verbosity ] [ -s slashsys ] [ -O nlgroup ] [ -b kbufsize ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
-static void scan_subdir (int fdat, char const *pathat, char const *list)
+static char subsystem[PATH_MAX] = "" ;
+static char mdev[PATH_MAX] = "" ;
+
+static int scan_subdir (int fdat, char const *pathat, char const *list)
 {
+  int r = 0 ;
   DIR *dir ;
+  direntry *d = 0 ;
+  direntry *lastd ;
   int fdlist = openat(fdat, list, O_RDONLY | O_DIRECTORY) ;
   if (fdlist < 0) strerr_diefu4sys(111, "open ", pathat, "/", list) ;
   dir = fdopendir(fdlist) ;
   if (!dir) strerr_diefu4sys(111, "fdopendir ", pathat, "/", list) ;
   for (;;)
   {
-    direntry *d ;
+    lastd = d ;
     errno = 0 ;
     d = readdir(dir) ;
     if (!d) break ;
@@ -37,10 +49,13 @@ static void scan_subdir (int fdat, char const *pathat, char const *list)
       if (write(fd, "add\n", 4) < 4)
         strerr_warnwu6sys("write to ", pathat, "/", list, "/", fn) ;
       close(fd) ;
+      r = 1 ;
     }
   }
   if (errno) strerr_diefu4sys(111, "readdir ", pathat, "/", list) ;
+  if (r) strncpy(mdev, lastd->d_name, PATH_MAX) ;
   dir_close(dir) ;
+  return r ;
 }
 
 static int scan_dir (char const *path, int add_devices)
@@ -63,9 +78,11 @@ static int scan_dir (char const *path, int add_devices)
       char fn[dlen + 9] ;
       memcpy(fn, d->d_name, dlen) ;
       memcpy(fn + dlen, "/devices", 9) ;
-      scan_subdir(fdpath, path, fn) ;
+      if (scan_subdir(fdpath, path, fn))
+        strncpy(subsystem, d->d_name, PATH_MAX) ;
     }
-    else scan_subdir(fdpath, path, d->d_name) ;
+    else if (scan_subdir(fdpath, path, d->d_name))
+      strncpy(subsystem, d->d_name, PATH_MAX) ;
   }
   if (errno) strerr_diefu2sys(111, "readdir ", path) ;
   dir_close(dir) ;
@@ -76,22 +93,40 @@ static int scan_dir (char const *path, int add_devices)
 int main (int argc, char const *const *argv, char const *const *envp)
 {
   char const *slashsys = "/sys" ;
+  unsigned int verbosity = 1 ;
+  unsigned int nlgroup = 0 ;
+  unsigned int kbufsz = 512288 ;
+  int nlfd = -1 ;
   PROG = "mdevd-coldplug" ;
   {
     subgetopt l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "s:", &l) ;
+      int opt = subgetopt_r(argc, argv, "v:s:O:b:", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
+        case 'v' : if (!uint0_scan(l.arg, &verbosity)) dieusage() ; break ;
         case 's' : slashsys = l.arg ; break ;
+        case 'O' : if (!uint0_scan(l.arg, &nlgroup)) dieusage() ; break ;
+        case 'b' : if (!uint0_scan(l.arg, &kbufsz)) dieusage() ; break ;
         default : dieusage() ;
       }
     }
     argc -= l.ind ; argv += l.ind ;
   }
 
+  nlgroup &= ~1 ;
+  if (nlgroup)
+  {
+    nlfd = mdevd_netlink_init(nlgroup, kbufsz) ;
+    if (nlfd == -1)
+      strerr_diefu1sys(111, "init netlink") ;
+    if (ndelay_off(nlfd) == -1)
+      strerr_diefu1sys(111, "make netlink socket non-blocking") ;
+  }
+
+ /* Trigger the uevents */
   {
     size_t slashsyslen = strlen(slashsys) ;
     char fn[slashsyslen + 11] ;
@@ -105,5 +140,19 @@ int main (int argc, char const *const *argv, char const *const *envp)
       if (!scan_dir(fn, 1)) strerr_diefu2sys(111, "open ", fn) ;
     }
   }
+
+ /* Wait for the last triggered uevent to be processed */
+  if (nlgroup && subsystem[0] && mdev[0])
+  {
+    struct uevent_s event ;
+    for (;;) if (mdevd_uevent_read(nlfd, &event, verbosity))
+    {
+      char *x = mdevd_uevent_getvar(&event, "SUBSYSTEM") ;
+      if (strcmp(x, subsystem)) continue ;
+      x = mdevd_uevent_getvar(&event, "MDEV") ;
+      if (!strcmp(x, mdev)) break ;
+    }
+  }
+
   return 0 ;
 }

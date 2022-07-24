@@ -28,7 +28,7 @@ for all these devices.
 <h2> Interface </h2>
 
 <pre>
-     mdevd-coldplug [ -s <em>slashsys</em> ]
+     mdevd-coldplug [ -v <em>verbosity</em> ] [ -s <em>slashsys</em> ] [ -O <em>nlgroup</em> ] [ -b <em>kbufsize</em> ]
 </pre>
 
 <ul>
@@ -43,8 +43,23 @@ at this point, it will pick up the series of events. </li>
 <h2> Options </h2>
 
 <ul>
+ <li> <tt>-v</tt>&nbsp;<em>verbosity</em>&nbsp;: be more or less verbose.
+Default verbosity is 1. 0 will only print fatal error messages, 3 or more
+is seriously verbose debugging. </li>
  <li> <tt>-s</tt>&nbsp;<em>slashsys</em>&nbsp;: assume the sysfs
 pseudo-filesystem is mounted on <em>slashsys</em>. Default is <tt>/sys</tt>. </li>
+ <li> <tt>-O</tt>&nbsp;<em>nlgroup</em>&nbsp;: synchronous coldplug.
+<tt>mdevd-coldplug</tt> will not exit until the last uevent it triggers
+has been handled by <a href="mdevd.html">mdevd</a>. <em>nlgroup</em>
+needs to be a netlink group that <a href="mdevd.html">mdevd</a> is
+rebroadcasting handled events to. Note that this option can only work
+if <a href="mdevd.html">mdevd</a> is running with a similar <tt>-O</tt>
+option with a compatible value; else, <tt>mdevd-coldplug</tt> will wait
+forever. </li>
+ <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
+<em>kbufsz</em> bytes for the netlink queue. The default is 500 kB;
+if you're getting "No buffer space available" errors, try increasing this number.
+This option is only meaningful when paired with the <tt>-O</tt> option. </li>
 </ul>
 
 <h2> Exit codes </h2>
