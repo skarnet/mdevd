@@ -24,7 +24,7 @@ static inline ssize_t fd_recvmsg (int fd, struct msghdr *hdr)
   return r ;
 }
 
-static inline size_t netlink_read (int fd, char *s, unsigned int verbosity)
+static inline size_t netlink_read (int fd, char *s, uint32_t options, unsigned int verbosity)
 {
   struct sockaddr_nl nl;
   struct iovec v = { .iov_base = s, .iov_len = UEVENT_MAX_SIZE } ;
@@ -44,7 +44,7 @@ static inline size_t netlink_read (int fd, char *s, unsigned int verbosity)
   if (!r) return 0 ;
   if (msg.msg_flags & MSG_TRUNC)
     strerr_diefu1x(111, "buffer too small for netlink message") ;
-  if (nl.nl_pid)
+  if (options & 1 && nl.nl_pid)
   {
     if (verbosity >= 3)
     {
@@ -67,10 +67,10 @@ static inline size_t netlink_read (int fd, char *s, unsigned int verbosity)
   return r ;
 }
 
-int mdevd_uevent_read (int fd, struct uevent_s *event, unsigned int verbosity)
+int mdevd_uevent_read (int fd, struct uevent_s *event, uint32_t options, unsigned int verbosity)
 {
   unsigned short len = 0 ;
-  event->len = netlink_read(fd, event->buf, verbosity) ;
+  event->len = netlink_read(fd, event->buf, options, verbosity) ;
   if (!event->len) return 0 ;
   event->varn = 0 ;
   while (len < event->len)

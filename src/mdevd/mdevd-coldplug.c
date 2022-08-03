@@ -145,9 +145,11 @@ int main (int argc, char const *const *argv, char const *const *envp)
   if (nlgroup && subsystem[0] && mdev[0])
   {
     struct uevent_s event ;
-    for (;;) if (mdevd_uevent_read(nlfd, &event, verbosity))
+    for (;;) if (mdevd_uevent_read(nlfd, &event, 0, verbosity))
     {
-      char *x = mdevd_uevent_getvar(&event, "SUBSYSTEM") ;
+      char *x = mdevd_uevent_getvar(&event, "ACTION") ;
+      if (strcmp(x, "add")) continue ;
+      x = mdevd_uevent_getvar(&event, "SUBSYSTEM") ;
       if (strcmp(x, subsystem)) continue ;
       x = mdevd_uevent_getvar(&event, "MDEV") ;
       if (!strcmp(x, mdev)) break ;

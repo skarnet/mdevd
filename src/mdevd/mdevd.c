@@ -862,7 +862,7 @@ static inline int handle_signals (struct uevent_s *event, scriptelem const *scri
 
 static inline int handle_event (int fd, struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
-  if (!mdevd_uevent_read(fd, event, verbosity) || event->varn <= 1) return 0 ;
+  if (!mdevd_uevent_read(fd, event, 1, verbosity) || event->varn <= 1) return 0 ;
   return on_event(event, script, scriptlen, storage, envmatch, ud) ;
 }
 

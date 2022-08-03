@@ -6,6 +6,7 @@
 #define UEVENT_MAX_VARS 63
 #define UEVENT_MAX_SIZE 8192
 
+#include <stdint.h>
 #include <limits.h>
 
 struct uevent_s
@@ -18,7 +19,7 @@ struct uevent_s
 #define UEVENT_ZERO { .len = 0, .varn = 0 }
 
 extern int mdevd_netlink_init (unsigned int, unsigned int) ;
-extern int mdevd_uevent_read (int, struct uevent_s *, unsigned int) ;
+extern int mdevd_uevent_read (int, struct uevent_s *, uint32_t, unsigned int) ;
 extern char *mdevd_uevent_getvar (struct uevent_s *, char const *) ;
 
 #endif
