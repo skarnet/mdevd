@@ -151,7 +151,7 @@ int main (int argc, char const *const *argv, char const *const *envp)
       if (strcmp(x, "add")) continue ;
       x = mdevd_uevent_getvar(&event, "SUBSYSTEM") ;
       if (strcmp(x, subsystem)) continue ;
-      x = mdevd_uevent_getvar(&event, "MDEV") ;
+      x = strrchr(mdevd_uevent_getvar(&event, "DEVPATH"), '/') + 1 ;
       if (!strcmp(x, mdev)) break ;
     }
   }

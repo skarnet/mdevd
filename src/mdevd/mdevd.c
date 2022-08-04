@@ -709,6 +709,7 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
       }
     }
     else spawn_command(storage + elem->command, event, elem->flagexecline, ud) ;
+    event->varn-- ; event->len -= 6 + nodelen ;
   }
 
   if (elem->movetype != MOVEINFO_NOCREATE && ud->action == ACTION_REMOVE && ud->mmaj >= 0)
