@@ -19,7 +19,7 @@
 static inline ssize_t fd_recvmsg (int fd, struct msghdr *hdr)
 {
   ssize_t r ;
-  do r = recvmsg(fd, hdr, MSG_DONTWAIT) ;
+  do r = recvmsg(fd, hdr, 0) ;
   while ((r == -1) && (errno == EINTR)) ;
   return r ;
 }
