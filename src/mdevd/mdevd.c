@@ -179,18 +179,22 @@ static int makesubdirs (char *path)
   return 1 ;
 }
 
-
-static inline int rebc_init (unsigned int groups)
+static inline int rebc_init (unsigned int groups, unsigned int kbufsz)
 {
   struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = groups & ~1U, .nl_pid = 0 } ;
   int fd = socket_internal(AF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT, O_CLOEXEC) ;
   if (fd == -1) return -1 ;
-  if (connect(fd, (struct sockaddr *)&nl, sizeof nl) == -1)
+  if (connect(fd, (struct sockaddr *)&nl, sizeof nl) == -1) goto err ;
+  if (setsockopt(fd, SOL_SOCKET, SO_SNDBUFFORCE, &kbufsz, sizeof(unsigned int)) < 0)
   {
-    fd_close(fd) ;
-    return -1 ;
+    if (errno != EPERM
+     || setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &kbufsz, sizeof(unsigned int)) < 0) goto err ;
   }
   return fd ;
+
+ err:
+  fd_close(fd) ;
+  return -1 ;
 }
 
 
@@ -867,7 +871,7 @@ static inline int handle_event (int fd, struct uevent_s *event, scriptelem const
   return on_event(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
-static int output_event (unsigned int outputfd, struct uevent_s *event)
+static inline int output_event (unsigned int outputfd, struct uevent_s *event)
 {
   static char const c = 0 ;
   struct iovec v[2] = { { .iov_base = event->buf, .iov_len = event->len }, { .iov_base = (char *)&c, .iov_len = 1 } } ;
@@ -882,7 +886,7 @@ static int output_event (unsigned int outputfd, struct uevent_s *event)
   return 1 ;
 }
 
-static void rebc_event (int fd, struct uevent_s const *event)
+static inline void rebc_event (int fd, struct uevent_s const *event)
 {
   if (fd_send(fd, event->buf, event->len, 0) == -1)
     strerr_warnwu1sys("rebroadcast uevent") ;
@@ -955,7 +959,7 @@ int main (int argc, char const *const *argv)
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
   if (rebc)
   {
-    int fd = rebc_init(rebc) ;
+    int fd = rebc_init(rebc, kbufsz) ;
     if (fd == -1) strerr_diefu2sys(111, "init netlink", " rebroadcast socket") ;
     rebc = fd ;
   }
@@ -1018,19 +1022,17 @@ int main (int argc, char const *const *argv)
 
       while (ud.pid || cont == 2)
       {
+        int done = 0 ;
         if (iopause_stamp(x, 1 + (!ud.pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
         if (x[0].revents & IOPAUSE_READ)
-          if (handle_signals(&event, script, scriptlen, storage, envmatch, &ud))
-          {
-            if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
-            if (rebc) rebc_event(rebc, &event) ;
-          }
+          done |= handle_signals(&event, script, scriptlen, storage, envmatch, &ud) ;
         if (!ud.pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          if (handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud))
-          {
-            if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
-            if (rebc) rebc_event(rebc, &event) ;
-          }
+          done |= handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud) ;
+        if (done)
+        {
+          if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
+          if (rebc) rebc_event(rebc, &event) ;
+        }
       }
 
       script_free(script, scriptlen, envmatch, envmatchlen) ;
