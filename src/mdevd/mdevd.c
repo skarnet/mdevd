@@ -1022,17 +1022,15 @@ int main (int argc, char const *const *argv)
 
       while (ud.pid || cont == 2)
       {
-        int done = 0 ;
         if (iopause_stamp(x, 1 + (!ud.pid && cont == 2), 0, 0) < 0) strerr_diefu1sys(111, "iopause") ;
-        if (x[0].revents & IOPAUSE_READ)
-          done |= handle_signals(&event, script, scriptlen, storage, envmatch, &ud) ;
-        if (!ud.pid && cont == 2 && x[1].revents & IOPAUSE_READ)
-          done |= handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud) ;
-        if (done)
-        {
-          if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
-          if (rebc) rebc_event(rebc, &event) ;
-        }
+        if (x[0].revents & IOPAUSE_READ && handle_signals(&event, script, scriptlen, storage, envmatch, &ud))
+          goto dorebc ;
+        if (!ud.pid && cont == 2 && x[1].revents & IOPAUSE_READ && handle_event(x[1].fd, &event, script, scriptlen, storage, envmatch, &ud))
+          goto dorebc ;
+        continue ;
+       dorebc:
+        if (outputfd && !output_event(outputfd, &event)) outputfd = 0 ;
+        if (rebc) rebc_event(rebc, &event) ;
       }
 
       script_free(script, scriptlen, envmatch, envmatchlen) ;
