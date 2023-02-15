@@ -13,9 +13,8 @@ libmdevd.a.xyzzy: src/mdevd/mdevd_netlink_init.o src/mdevd/mdevd_uevent_read.o s
 else
 libmdevd.a.xyzzy: src/mdevd/mdevd_netlink_init.lo src/mdevd/mdevd_uevent_read.lo src/mdevd/mdevd_uevent_getvar.lo
 endif
-libmdevd.so.xyzzy: EXTRA_LIBS :=
-libmdevd.so.xyzzy: src/mdevd/mdevd_netlink_init.lo src/mdevd/mdevd_uevent_read.lo src/mdevd/mdevd_uevent_getvar.lo
 mdevd: EXTRA_LIBS := -lskarnet ${MAYBEPTHREAD_LIB}
 mdevd: src/mdevd/mdevd.o libmdevd.a.xyzzy ${LIBNSSS}
 mdevd-coldplug: EXTRA_LIBS := -lskarnet
 mdevd-coldplug: src/mdevd/mdevd-coldplug.o libmdevd.a.xyzzy
+INTERNAL_LIBS := libmdevd.a.xyzzy
