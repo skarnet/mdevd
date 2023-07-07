@@ -61,7 +61,7 @@ static int scan_subdir (int fdat, char const *pathat, char const *list)
 static int scan_dir (char const *path, int add_devices)
 {
   DIR *dir ;
-  int fdpath = open(path, O_RDONLY | O_DIRECTORY) ;
+  int fdpath = open2(path, O_RDONLY | O_DIRECTORY) ;
   if (fdpath < 0) return 0 ;
   dir = fdopendir(fdpath) ;
   if (!dir) strerr_diefu2sys(111, "fdopendir ", path) ;
