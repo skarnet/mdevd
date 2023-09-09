@@ -74,7 +74,10 @@ every time it receives an event (which can add up to hundreds of times at boot!)
 By contrast, mdevd only parses its config file when it starts - or when
 it is told to read it again by a SIGHUP; the event processing is
 streamlined, it does not involve any parsing or any kind of expensive
-operation - so it is significantly faster. </li>
+operation - so it is significantly faster. Additionally, unlike mdev,
+mdevd does not fork its helper scripts &mdash; it uses
+<a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_spawn.html">posix_spawn</a>
+instead, which is a lot faster. </li>
  <li> Independence from busybox: <tt>mdev</tt> is part of the
 <a href="https://busybox.net/">busybox</a> software. It is an advantage
 when busybox is also used to provide other functionality, such as
@@ -99,11 +102,11 @@ and does not pull in any unnecessary code. </li>
 The Linux kernel must be 2.6.10 or later. </li>
  <li> GNU make, version 3.81 or later </li>
  <li> <a href="//skarnet.org/software/skalibs/">skalibs</a> version
-2.13.2.0 or later. It's a build-time requirement. It's also a run-time
+2.14.0.0 or later. It's a build-time requirement. It's also a run-time
 requirement if you link against the shared version of the skalibs
 library. </li>
  <li> Optionally: <a href="//skarnet.org/software/execline/">nsss</a>
-version 0.2.0.3 or later. It's a build-time and run-time requirement, if
+version 0.2.0.4 or later. It's a build-time and run-time requirement, if
 you use the <tt>--enable-nsss</tt> option to configure; but you would
 only do that if you're replacing nsswitch on your whole system, and most
 people are not. </li>

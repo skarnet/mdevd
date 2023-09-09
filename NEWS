@@ -3,6 +3,7 @@ Changelog for mdevd.
 In 0.1.6.3
 ----------
 
+ - Adaptation to skalibs-2.14.0.0.
  - Bugfixes.
 
 
