@@ -33,6 +33,7 @@
 #include <skalibs/selfpipe.h>
 #include <skalibs/tai.h>
 #include <skalibs/env.h>
+#include <skalibs/cspawn.h>
 #include <skalibs/djbunix.h>
 #include <skalibs/iopause.h>
 #include <skalibs/socket.h>
@@ -566,7 +567,7 @@ static inline void spawn_command (char const *command, struct uevent_s const *ev
     if (verbosity) strerr_warnwu1sys("merge environment to spawn command") ;
     return ;
   }
-  ud->pid = child_spawn0(argv[0], argv, envp) ;
+  ud->pid = cspawn(argv[0], argv, envp, CSPAWN_FLAGS_SELFPIPE_FINISH, 0, 0) ;
   if (!ud->pid)
   {
     if (verbosity) strerr_warnwu2sys("spawn ", argv[0]) ;
@@ -1009,7 +1010,7 @@ int main (int argc, char const *const *argv)
       {
         char const *cargv[2] = { MDEVD_BINPREFIX "mdevd-coldplug", 0 } ;
         char const *cenv = 0 ;
-        if (!child_spawn0(cargv[0], cargv, &cenv))
+        if (!cspawn(cargv[0], cargv, &cenv, CSPAWN_FLAGS_SELFPIPE_FINISH, 0, 0))
           strerr_warnwu2sys("spawn ", cargv[0]) ;
         docoldplug = 0 ;
       }
