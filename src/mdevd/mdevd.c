@@ -562,11 +562,7 @@ static inline void spawn_command (char const *command, struct uevent_s const *ev
   char const *argv[4] = { isel ? "execlineb" : "/bin/sh", isel ? "-Pc" : "-c", command, 0 } ;
   size_t envlen = env_len((char const **)environ) ;
   char const *envp[envlen + event->varn + 1] ;
-  if (!env_merge(envp, envlen + event->varn + 1, (char const **)environ, envlen, event->buf + event->vars[1], event->len - event->vars[1]))
-  {
-    if (verbosity) strerr_warnwu1sys("merge environment to spawn command") ;
-    return ;
-  }
+  env_merge(envp, envlen + event->varn + 1, (char const **)environ, envlen, event->buf + event->vars[1], event->len - event->vars[1]) ;
   ud->pid = cspawn(argv[0], argv, envp, CSPAWN_FLAGS_SELFPIPE_FINISH, 0, 0) ;
   if (!ud->pid)
   {
