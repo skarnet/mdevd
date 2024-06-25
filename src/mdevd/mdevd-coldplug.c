@@ -147,7 +147,7 @@ int main (int argc, char const *const *argv, char const *const *envp)
     struct uevent_s event ;
     for (;;) if (mdevd_uevent_read(nlfd, &event, 0, verbosity))
     {
-      char *x = mdevd_uevent_getvar(&event, "ACTION") ;
+      char const *x = mdevd_uevent_getvar(&event, "ACTION") ;
       if (strcmp(x, "add")) continue ;
       x = mdevd_uevent_getvar(&event, "SUBSYSTEM") ;
       if (strcmp(x, subsystem)) continue ;

@@ -128,13 +128,14 @@ static scriptelem const scriptelem_catchall =
 typedef struct udata_s udata, *udata_ref ;
 struct udata_s
 {
-  char *devname ;
+  char const *devname ;
   mode_t devtype ;
   unsigned int action ;
   int mmaj ;
   int mmin ;
   pid_t pid ;
   unsigned short i ;
+  char sysdevpath[PATH_MAX] ;
   char buf[UEVENT_MAX_SIZE] ;
 } ;
 #define UDATA_ZERO { .devname = 0, .devtype = 0, .action = 0, .mmaj = -1, .mmin = -1, .pid = 0, .i = 0, .buf = "" }
@@ -151,10 +152,13 @@ static inline void script_free (scriptelem *script, unsigned short scriptlen, st
   for (i = 0 ; i < envmatchlen ; i++) regfree(&envmatch[i].re) ;
 }
 
-static inline int mkdirp (char *s)
+static inline int mkdirp (char const *path)
 {
-  size_t n = strlen(s) ;
+  size_t n = strlen(path) ;
+  if (!n) return 1 ;
+  char s[n + 1] ;
   size_t i = 0 ;
+  memcpy(s, path, n+1) ;
   for (; i < n ; i++)
   {
     if (s[i] == '/')
@@ -170,7 +174,7 @@ static inline int mkdirp (char *s)
   return i >= n ;
 }
 
-static int makesubdirs (char *path)
+static int makesubdirs (char const *path)
 {
   if (strrchr(path, '/') && !mkdirp(path))
   {
@@ -557,12 +561,18 @@ static inline ssize_t alias_format (char *out, size_t outmax, char const *in, ch
   return w ;
 }
 
-static inline void spawn_command (char const *command, struct uevent_s const *event, int isel, udata *ud)
+static inline void spawn_command (char const *command, struct uevent_s const *event, int isel, udata *ud, char const *extra)
 {
   char const *argv[4] = { isel ? "execlineb" : "/bin/sh", isel ? "-Pc" : "-c", command, 0 } ;
   size_t envlen = env_len((char const **)environ) ;
-  char const *envp[envlen + event->varn + 1] ;
-  env_merge(envp, envlen + event->varn + 1, (char const **)environ, envlen, event->buf + event->vars[1], event->len - event->vars[1]) ;
+  size_t n ;
+  char const *envp[envlen + event->varn + 1 + !!extra] ;
+  n = env_merge(envp, envlen + event->varn + 1, (char const **)environ, envlen, event->buf + event->vars[1], event->len - event->vars[1]) ;
+  if (extra)
+  {
+    envp[n - 1] = extra ;
+    envp[n++] = 0 ;
+  }
   ud->pid = cspawn(argv[0], argv, envp, CSPAWN_FLAGS_SELFPIPE_FINISH, 0, 0) ;
   if (!ud->pid)
   {
@@ -570,11 +580,12 @@ static inline void spawn_command (char const *command, struct uevent_s const *ev
   }
 }
 
-static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static inline int run_scriptelem (struct uevent_s const *event, scriptelem const *elem, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   size_t devnamelen = strlen(ud->devname) ;
   size_t nodelen = 0 ;
-  char *node = event->buf + event->len + 5 ;
+  char nodebuf[PATH_MAX] = "MDEV=" ;
+  char *node = nodebuf + 5 ;
   regmatch_t off[10] ;
   unsigned short i = 0 ;
   for (; i < elem->envmatchlen ; i++)
@@ -608,27 +619,28 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
     case MOVEINFO_MOVE :
     case MOVEINFO_MOVEANDLINK :
     {
-      ssize_t r = alias_format(node, PATH_MAX, storage + elem->movepath, ud->devname, off) ;
+      ssize_t r = alias_format(node, PATH_MAX - 5, storage + elem->movepath, ud->devname, off) ;
       if (r <= 1)
       {
         if (verbosity) strerr_warnwu5sys("process expression \"", storage + elem->movepath, "\" with devname \"", ud->devname, "\"") ;
         return -1 ;
       }
-      if (node[r - 2] == '/')
+      nodelen = r - 1 ;
+      if (node[nodelen - 1] == '/')
       {
-        if (r + devnamelen >= PATH_MAX)
+        if (nodelen + devnamelen >= PATH_MAX - 6)
         {
           errno = ENAMETOOLONG ;
           if (verbosity) strerr_warnwu2sys("create alias for ", ud->devname) ;
           return -1 ;
         }
-        memcpy(node + r - 1, ud->devname, devnamelen + 1) ;
-        nodelen = r + devnamelen - 1 ;
+        memcpy(node + nodelen, ud->devname, devnamelen + 1) ;
+        nodelen += devnamelen ;
       }
       break ;
     }
   }
-  if (elem->movetype != MOVEINFO_NOCREATE && ud->action == ACTION_ADD && ud->mmaj >= 0)
+  if (nodelen && ud->action == ACTION_ADD && ud->mmaj >= 0)
   {
     if (!makesubdirs(node)) return -1 ;
     if (dryrun)
@@ -684,12 +696,6 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
 
   if (elem->cmdtype == ACTION_ANY || ud->action == elem->cmdtype)
   {
-    if (!mdevd_uevent_getvar(event, "MDEV"))
-    {
-      event->vars[event->varn++] = event->len ;
-      memcpy(event->buf + event->len, "MDEV=", 5) ;
-      event->len += 6 + nodelen ;
-    }
     if (dryrun)
     {
       strerr_warni4x("dry run: spawn ", elem->flagexecline ? "execlineb" : "/bin/sh", " for: ", storage + elem->command) ;
@@ -705,12 +711,16 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
           buf[j+len] = ' ' ;
           j += len+1 ;
         }
+        if (nodelen)
+        {
+          memcpy(buf + j, nodebuf, nodelen + 5) ;
+          j += nodelen + 6 ;
+        }
         buf[j-1] = 0 ;
         strerr_warni2x("dry run: added variables: ", buf) ;
       }
     }
-    else spawn_command(storage + elem->command, event, elem->flagexecline, ud) ;
-    event->varn-- ; event->len -= 6 + nodelen ;
+    else spawn_command(storage + elem->command, event, elem->flagexecline, ud, nodelen ? nodebuf : 0) ;
   }
 
   if (elem->movetype != MOVEINFO_NOCREATE && ud->action == ACTION_REMOVE && ud->mmaj >= 0)
@@ -727,16 +737,17 @@ static inline int run_scriptelem (struct uevent_s *event, scriptelem const *elem
   return !elem->flagcont ;
 }
 
-static int run_script (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static int run_script (struct uevent_s const *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   for (; ud->i < scriptlen && !ud->pid ; ud->i++)
     if (run_scriptelem(event, script + ud->i, storage, envmatch, ud)) ud->i = scriptlen - 1 ;
   return ud->i >= scriptlen && !ud->pid ;
 }
 
-static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t sysdevpathlen, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static inline int act_on_event (struct uevent_s const *event, unsigned int action, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
   ssize_t hasmajmin = 0 ;
+  size_t sysdevpathlen = strlen(ud->sysdevpath) ;
   unsigned int mmaj, mmin ;
   char const *x = mdevd_uevent_getvar(event, "MAJOR") ;
   ud->devtype = S_IFCHR ;
@@ -750,9 +761,9 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
     }
     if (!hasmajmin)
     {
-      memcpy(sysdevpath + sysdevpathlen, "/dev", 5) ;
-      hasmajmin = openreadnclose(sysdevpath, ud->buf, UINT_FMT << 1) ;
-      sysdevpath[sysdevpathlen] = 0 ;
+      memcpy(ud->sysdevpath + sysdevpathlen, "/dev", 5) ;
+      hasmajmin = openreadnclose(ud->sysdevpath, ud->buf, UINT_FMT << 1) ;
+      ud->sysdevpath[sysdevpathlen] = 0 ;
       if (hasmajmin > 0)
       {
         size_t i = uint_scan(ud->buf, &mmaj) ;
@@ -773,9 +784,9 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
   if (!ud->devname)
   {
     ssize_t r ;
-    memcpy(sysdevpath + sysdevpathlen, "/uevent", 8) ;
-    r = openreadnclose(sysdevpath, ud->buf, UEVENT_MAX_SIZE-1) ;
-    sysdevpath[sysdevpathlen] = 0 ;
+    memcpy(ud->sysdevpath + sysdevpathlen, "/uevent", 8) ;
+    r = openreadnclose(ud->sysdevpath, ud->buf, UEVENT_MAX_SIZE-1) ;
+    ud->sysdevpath[sysdevpathlen] = 0 ;
     if (r > 0)
     {
       ud->buf[r] = 0 ;
@@ -786,14 +797,14 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
         *strchr(ud->devname, '\n') = 0 ;
       }
     }
-    if (!ud->devname) ud->devname = basename(sysdevpath) ;
+    if (!ud->devname) ud->devname = basename(ud->sysdevpath) ;
   }
   if (strlen(ud->devname) >= PATH_MAX - 1)
   {
     if (verbosity) strerr_warnwu2x("device name too long: ", ud->devname) ;
     return 1 ;
   }
-  if (strstr(sysdevpath, "/block/")) ud->devtype = S_IFBLK ;
+  if (strstr(ud->sysdevpath, "/block/")) ud->devtype = S_IFBLK ;
   else
   {
     x = mdevd_uevent_getvar(event, "SUBSYSTEM") ;
@@ -803,10 +814,11 @@ static inline int act_on_event (struct uevent_s *event, char *sysdevpath, size_t
   return run_script(event, script, scriptlen, storage, envmatch, ud) ;
 }
 
-static inline int on_event (struct uevent_s *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
+static inline int on_event (struct uevent_s const *event, scriptelem const *script, unsigned short scriptlen, char const *storage, struct envmatch_s const *envmatch, udata *ud)
 {
-  unsigned int action ;
+  int done = 1 ;
   char const *x = mdevd_uevent_getvar(event, "ACTION") ;
+  unsigned int action ;
   if (!x) return 1 ;
   if (!strcmp(x, "add")) action = ACTION_ADD ;
   else if (!strcmp(x, "remove")) action = ACTION_REMOVE ;
@@ -814,17 +826,15 @@ static inline int on_event (struct uevent_s *event, scriptelem const *script, un
   x = mdevd_uevent_getvar(event, "DEVPATH") ;
   if (!x) return 1 ;
   {
-    int done = 1 ;
     size_t devpathlen = strlen(x) ;
     size_t slashsyslen = strlen(slashsys) ;
-    char sysdevpath[devpathlen + slashsyslen + 8] ; /* act_on_event needs the extra storage */
-    memcpy(sysdevpath, slashsys, slashsyslen) ;
-    memcpy(sysdevpath + slashsyslen, x, devpathlen + 1) ;
-    x = mdevd_uevent_getvar(event, "FIRMWARE") ;
-    if (action == ACTION_ADD || !x) done = act_on_event(event, sysdevpath, slashsyslen + devpathlen, action, script, scriptlen, storage, envmatch, ud) ;
-    if (action == ACTION_ADD && x) load_firmware(x, sysdevpath) ;
-    return done ;
+    memcpy(ud->sysdevpath, slashsys, slashsyslen) ;
+    memcpy(ud->sysdevpath + slashsyslen, x, devpathlen + 1) ;
   }
+  x = mdevd_uevent_getvar(event, "FIRMWARE") ;
+  if (action == ACTION_ADD || !x) done = act_on_event(event, action, script, scriptlen, storage, envmatch, ud) ;
+  if (action == ACTION_ADD && x) load_firmware(x, ud->sysdevpath) ;
+  return done ;
 }
 
 

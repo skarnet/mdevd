@@ -4,7 +4,7 @@
 
 #include "mdevd-internal.h"
 
-char *mdevd_uevent_getvar (struct uevent_s *event, char const *var)
+char const *mdevd_uevent_getvar (struct uevent_s const *event, char const *var)
 {
   size_t varlen = strlen(var) ;
   unsigned short i = 1 ;

@@ -20,6 +20,6 @@ struct uevent_s
 
 extern int mdevd_netlink_init (unsigned int, unsigned int) ;
 extern int mdevd_uevent_read (int, struct uevent_s *, uint32_t, unsigned int) ;
-extern char *mdevd_uevent_getvar (struct uevent_s *, char const *) ;
+extern char const *mdevd_uevent_getvar (struct uevent_s const *, char const *) ;
 
 #endif
