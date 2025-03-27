@@ -1,4 +1,4 @@
 package=mdevd
-version=0.1.6.5
+version=0.1.6.6
 category=admin
 package_macro_name=MDEVD
