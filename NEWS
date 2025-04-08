@@ -1,9 +1,10 @@
 Changelog for mdevd.
 
-In 0.1.6.6
+In 0.1.7.0
 ----------
 
  - Bugfixes.
+ - New option: -I intake.
 
 
 In 0.1.6.5
