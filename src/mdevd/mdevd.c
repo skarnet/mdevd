@@ -43,7 +43,7 @@
 #include <mdevd/config.h>
 #include "mdevd-internal.h"
 
-#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -o outputfd ] [ -O nlgroups ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
+#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -I intake ] [ -o outputfd ] [ -O nlgroups ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 #define CONFBUFSIZE 8192
@@ -186,7 +186,7 @@ static int makesubdirs (char const *path)
 
 static inline int rebc_init (unsigned int groups, unsigned int kbufsz)
 {
-  struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = groups & ~1U, .nl_pid = 0 } ;
+  struct sockaddr_nl nl = { .nl_family = AF_NETLINK, .nl_pad = 0, .nl_groups = groups, .nl_pid = 0 } ;
   int fd = socket_internal(AF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT, O_CLOEXEC) ;
   if (fd == -1) return -1 ;
   if (connect(fd, (struct sockaddr *)&nl, sizeof nl) == -1) goto err ;
@@ -907,6 +907,7 @@ int main (int argc, char const *const *argv)
   unsigned int kbufsz = 512288 ;
   char const *slashdev = "/dev" ;
   int docoldplug = 0 ;
+  unsigned int intake = 1 ;
   unsigned int outputfd = 0 ;
   unsigned int rebc = 0 ;
   PROG = "mdevd" ;
@@ -914,13 +915,14 @@ int main (int argc, char const *const *argv)
     subgetopt l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "nv:D:o:O:b:f:s:d:F:C", &l) ;
+      int opt = subgetopt_r(argc, argv, "nv:D:I:o:O:b:f:s:d:F:C", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
         case 'n' : dryrun = 1 ; break ;
         case 'v' : if (!uint0_scan(l.arg, &verbosity)) dieusage() ; break ;
         case 'D' : if (!uint0_scan(l.arg, &notif)) dieusage() ; break ;
+        case 'I' : if (!uint0_scan(l.arg, &intake)) dieusage() ; break ;
         case 'o' : if (!uint0_scan(l.arg, &outputfd)) dieusage() ; break ;
         case 'O' : if (!uint0_scan(l.arg, &rebc)) dieusage() ; break ;
         case 'b' : if (!uint0_scan(l.arg, &kbufsz)) dieusage() ; break ;
@@ -947,6 +949,16 @@ int main (int argc, char const *const *argv)
     if (notif < 3) strerr_dief1x(100, "notification fd must be 3 or more") ;
     if (fcntl(notif, F_GETFD) < 0) strerr_dief1sys(100, "invalid notification fd") ;
   }
+  {
+    unsigned int loop = rebc & (intake | 1) ;
+    if (loop)
+    {
+      char fmt[UINT_FMT] ;
+      fmt[uint_fmt(fmt, loop)] = 0 ;
+      strerr_warnw3x("ignoring rebroadcast request on nlgroups ", fmt, " to avoid loops") ;
+      rebc &= ~loop ;
+    }
+  }
   if (outputfd)
   {
     if (outputfd < 3) strerr_dief1x(100, "output fd must be 3 or more") ;
@@ -961,8 +973,7 @@ int main (int argc, char const *const *argv)
     root_maj = major(st.st_dev) ;
     root_min = minor(st.st_dev) ;
   }
-
-  x[1].fd = mdevd_netlink_init(1, kbufsz) ;
+  x[1].fd = mdevd_netlink_init(intake, kbufsz) ;
   if (x[1].fd < 0) strerr_diefu1sys(111, "init netlink") ;
   if (rebc)
   {
@@ -973,7 +984,8 @@ int main (int argc, char const *const *argv)
 
   x[0].fd = selfpipe_init() ;
   if (x[0].fd < 0) strerr_diefu1sys(111, "init selfpipe") ;
-  if (!sig_altignore(SIGPIPE)) strerr_diefu1sys(111, "ignore SIGPIPE") ;
+  if (!sig_altignore(SIGPIPE))
+    strerr_diefu1sys(111, "ignore SIGPIPE") ;
   {
     sigset_t set ;
     sigemptyset(&set) ;
