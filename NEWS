@@ -4,6 +4,7 @@ In 0.1.7.0
 ----------
 
  - Bugfixes.
+ - pkg-config support.
  - New option: -I intake.
 
 

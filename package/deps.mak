@@ -11,10 +11,10 @@ src/mdevd/mdevd_uevent_read.o src/mdevd/mdevd_uevent_read.lo: src/mdevd/mdevd_ue
 ifeq ($(strip $(STATIC_LIBS_ARE_PIC)),)
 libmdevd.a.xyzzy: src/mdevd/mdevd_netlink_init.o src/mdevd/mdevd_uevent_read.o src/mdevd/mdevd_uevent_getvar.o
 else
-libmdevd.a.xyzzy: src/mdevd/mdevd_netlink_init.lo src/mdevd/mdevd_uevent_read.lo src/mdevd/mdevd_uevent_getvar.lo
+libmdevd.a.xyzzy:src/mdevd/mdevd_netlink_init.lo src/mdevd/mdevd_uevent_read.lo src/mdevd/mdevd_uevent_getvar.lo
 endif
-mdevd: EXTRA_LIBS := -lskarnet ${MAYBEPTHREAD_LIB}
-mdevd: src/mdevd/mdevd.o libmdevd.a.xyzzy ${LIBNSSS}
-mdevd-coldplug: EXTRA_LIBS := -lskarnet
-mdevd-coldplug: src/mdevd/mdevd-coldplug.o libmdevd.a.xyzzy
+mdevd: EXTRA_LIBS := ${MAYBEPTHREAD_LIB}
+mdevd: src/mdevd/mdevd.o libmdevd.a.xyzzy ${LIBNSSS} -lskarnet
+mdevd-coldplug: EXTRA_LIBS :=
+mdevd-coldplug: src/mdevd/mdevd-coldplug.o libmdevd.a.xyzzy -lskarnet
 INTERNAL_LIBS := libmdevd.a.xyzzy

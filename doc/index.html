@@ -59,8 +59,8 @@ uncontrollable log file growth). By contrast, mdevd logs to stderr and its
 messages can be handled by any log infrastructure such as the one provided
 by a supervision suite. </li>
  <li> Better memory efficiency: <tt>mdev -d</tt> uses its own environment
-(via <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/putenv.html">putenv()</a>
-and <a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/unsetenv.html">unsetenv()</a>)
+(via <a href="https://pubs.opengroup.org/onlinepubs/9799919799/functions/putenv.html">putenv()</a>
+and <a href="https://pubs.opengroup.org/onlinepubs/9799919799/functions/unsetenv.html">unsetenv()</a>)
 to store uevent data for each event. This implies repeated allocations of
 heap memory. By contrast, mdevd does not use its own environment - it
 only uses heap memory to compile its regular expressions, which only happens
@@ -69,14 +69,14 @@ memory it uses is committed in the stack, and it will never require more.
 mdevd cannot fail due to lack of memory while it is processing events. </li>
  <li> Better speed: <tt>mdev -d</tt> parses its config file for every
 event it receives, and has to perform expensive operations such as
-<a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/getpwnam.html">getpwnam()</a>
+<a href="https://pubs.opengroup.org/onlinepubs/9799919799/functions/getpwnam.html">getpwnam()</a>
 every time it receives an event (which can add up to hundreds of times at boot!).
 By contrast, mdevd only parses its config file when it starts - or when
 it is told to read it again by a SIGHUP; the event processing is
 streamlined, it does not involve any parsing or any kind of expensive
 operation - so it is significantly faster. Additionally, unlike mdev,
 mdevd does not fork its helper scripts &mdash; it uses
-<a href="https://pubs.opengroup.org/onlinepubs/9699919799/functions/posix_spawn.html">posix_spawn</a>
+<a href="https://pubs.opengroup.org/onlinepubs/9799919799/functions/posix_spawn.html">posix_spawn</a>
 instead, which is a lot faster. </li>
  <li> Independence from busybox: <tt>mdev</tt> is part of the
 <a href="https://busybox.net/">busybox</a> software. It is an advantage
@@ -106,7 +106,7 @@ The Linux kernel must be 2.6.10 or later. </li>
 requirement if you link against the shared version of the skalibs
 library. </li>
  <li> Optionally: <a href="//skarnet.org/software/execline/">nsss</a>
-version 0.2.0.6 or later. It's a build-time and run-time requirement, if
+version 0.2.1.0 or later. It's a build-time and run-time requirement, if
 you use the <tt>--enable-nsss</tt> option to configure; but you would
 only do that if you're replacing nsswitch on your whole system, and most
 people are not. </li>
