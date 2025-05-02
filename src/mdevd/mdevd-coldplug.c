@@ -15,7 +15,7 @@
 
 #include "mdevd-internal.h"
 
-#define USAGE "mdevd-coldplug [ -v verbosity ] [ -s slashsys ] [ -O nlgroup ] [ -b kbufsize ]"
+#define USAGE "mdevd-coldplug [ -v verbosity ] [ -s slashsys ] [ -O nlgroup ] [ -b kbufsz ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 static char subsystem[PATH_MAX] = "" ;
@@ -95,7 +95,7 @@ int main (int argc, char const *const *argv, char const *const *envp)
   char const *slashsys = "/sys" ;
   unsigned int verbosity = 1 ;
   unsigned int nlgroup = 0 ;
-  unsigned int kbufsz = 512288 ;
+  unsigned int kbufsz = 1048576 ;
   int nlfd = -1 ;
   PROG = "mdevd-coldplug" ;
   {

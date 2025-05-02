@@ -38,10 +38,15 @@ static inline size_t netlink_read (int fd, char *s, uint32_t options, unsigned i
     .msg_controllen = 0,
     .msg_flags = 0
   } ;
-  ssize_t r = sanitize_read(fd_recvmsg(fd, &msg)) ;
-  if (r < 0)
-    strerr_diefu1sys(111, "receive netlink message") ;
-  if (!r) return 0 ;
+  ssize_t r ;
+  for (;;)
+  {
+    r = sanitize_read(fd_recvmsg(fd, &msg)) ;
+    if (r > 0) break ;
+    if (!r) return 0 ;
+    if (errno != ENOBUFS) strerr_diefu1sys(111, "read netlink message") ;
+    strerr_warnw1x("missed events! you should increase the -b kbufsz value") ;
+  }
   if (msg.msg_flags & MSG_TRUNC)
     strerr_diefu1x(111, "buffer too small for netlink message") ;
   if (options & 1 && nl.nl_pid)

@@ -119,9 +119,9 @@ cause a loop by chaining two separate instances of mdevd. mdevd will protect
 you against accidents, not against intentional stupidity.) </li>
  <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
 <em>kbufsz</em> bytes for the netlink queue. Too large a buffer wastes kernel memory;
-too small a buffer risks losing events. The default is <strong>512288</strong>,
-meaning 500 kB, which should be
-enough for most systems; if you're getting "No buffer space available" errors
+too small a buffer risks losing events. The default is <strong>1048576</strong>,
+meaning 1 MiB, which should be
+enough for most systems; if you're getting "missed events" warnings
 from mdevd at coldplug time, try increasing this number. </li>
  <li> <tt>-n</tt>&nbsp;: dry run. mdevd will not create or delete
 device nodes, and it will not spawn commands. Instead, it will print to stdout

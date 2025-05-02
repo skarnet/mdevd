@@ -28,7 +28,7 @@ for all these devices.
 <h2> Interface </h2>
 
 <pre>
-     mdevd-coldplug [ -v <em>verbosity</em> ] [ -s <em>slashsys</em> ] [ -O <em>nlgroup</em> ] [ -b <em>kbufsize</em> ]
+     mdevd-coldplug [ -v <em>verbosity</em> ] [ -s <em>slashsys</em> ] [ -O <em>nlgroup</em> ] [ -b <em>kbufsz</em> ]
 </pre>
 
 <ul>
@@ -57,8 +57,8 @@ if <a href="mdevd.html">mdevd</a> is running with a similar <tt>-O</tt>
 option with a compatible value; else, <tt>mdevd-coldplug</tt> will wait
 forever. </li>
  <li> <tt>-b</tt>&nbsp;<em>kbufsz</em>&nbsp;: try and reserve a kernel buffer of
-<em>kbufsz</em> bytes for the netlink queue. The default is 500 kB;
-if you're getting "No buffer space available" errors, try increasing this number.
+<em>kbufsz</em> bytes for the netlink queue. The default is 1 MiB;
+if you're getting related warnings on stderr, try increasing this number.
 This option is only meaningful when paired with the <tt>-O</tt> option. </li>
 </ul>
 
