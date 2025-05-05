@@ -6,6 +6,8 @@ In 0.1.7.0
  - Bugfixes.
  - pkg-config support.
  - New option: -I intake.
+ - Default kernel buffer space increased to 1 MiB.
+ - mdevd does not die on lack of kernel buffer space, warns instead.
 
 
 In 0.1.6.5
