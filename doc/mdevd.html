@@ -49,7 +49,7 @@ to running mdevd over mdev. </li>
 <h2> Interface </h2>
 
 <pre>
-     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -I <em>intake</em> ] [ -o <em>outputfd</em> ] [ -I <em>intake</em> ] [ -O <em>nlgroups</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ] [ -C ]
+     mdevd [ -v <em>verbosity</em> ] [ -D <em>notif</em> ] [ -I <em>intake</em> ] [ -o <em>outputfd</em> ] [ -I <em>intake</em> ] [ -O <em>nlgroups</em> ] [ -b <em>kbufsz</em> ] [ -f <em>conffile</em> ] [ -n | -N ] [ -s <em>slashsys</em> ] [ -d <em>slashdev</em> ] [ -F <em>fwbase</em> ] [ -C ]
 </pre>
 
 <ul>
@@ -126,6 +126,9 @@ from mdevd at coldplug time, try increasing this number. </li>
  <li> <tt>-n</tt>&nbsp;: dry run. mdevd will not create or delete
 device nodes, and it will not spawn commands. Instead, it will print to stdout
 the actions it would have performed. </li>
+ <li> <tt>-N</tt>&nbsp;: configuration file test. mdevd will not run, it will
+only parse its configuration file and exit 0 on success or nonzero (with an
+error message) on failure. This option overrides, and is overridden by, <tt>-n</tt>. </li>
  <li> <tt>-f</tt>&nbsp;<em>conffile</em>&nbsp;: read the configuration
 file from <em>conffile</em>. Default is <tt>/etc/mdev.conf</tt>.
 <em>conffile</em> must be an absolute path. </li>

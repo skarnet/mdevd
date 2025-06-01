@@ -43,7 +43,7 @@
 #include <mdevd/config.h>
 #include "mdevd-internal.h"
 
-#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -I intake ] [ -o outputfd ] [ -O nlgroups ] [ -b kbufsz ] [ -f conffile ] [ -n ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
+#define USAGE "mdevd [ -v verbosity ] [ -D notif ] [ -I intake ] [ -o outputfd ] [ -O nlgroups ] [ -b kbufsz ] [ -f conffile ] [ -n | -N ] [ -s slashsys ] [ -d slashdev ] [ -F fwbase ] [ -C ]"
 #define dieusage() strerr_dieusage(100, USAGE)
 
 #define CONFBUFSIZE 8192
@@ -915,11 +915,12 @@ int main (int argc, char const *const *argv)
     subgetopt l = SUBGETOPT_ZERO ;
     for (;;)
     {
-      int opt = subgetopt_r(argc, argv, "nv:D:I:o:O:b:f:s:d:F:C", &l) ;
+      int opt = subgetopt_r(argc, argv, "nNv:D:I:o:O:b:f:s:d:F:C", &l) ;
       if (opt == -1) break ;
       switch (opt)
       {
         case 'n' : dryrun = 1 ; break ;
+        case 'N' : dryrun = 2 ; break ;
         case 'v' : if (!uint0_scan(l.arg, &verbosity)) dieusage() ; break ;
         case 'D' : if (!uint0_scan(l.arg, &notif)) dieusage() ; break ;
         case 'I' : if (!uint0_scan(l.arg, &intake)) dieusage() ; break ;
@@ -1023,6 +1024,7 @@ int main (int argc, char const *const *argv)
       memset(script, 0, scriptlen * sizeof(scriptelem)) ;
       script[scriptlen++] = scriptelem_catchall ;
       script_secondpass(storage, script, envmatch) ;
+      if (dryrun == 2) break ;
       cont = 2 ;
       if (docoldplug)
       {
