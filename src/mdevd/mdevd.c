@@ -152,7 +152,7 @@ static inline void script_free (scriptelem *script, unsigned short scriptlen, st
   for (i = 0 ; i < envmatchlen ; i++) regfree(&envmatch[i].re) ;
 }
 
-static inline int mkdirp (char const *path)
+static inline int mdevd_mkdirp (char const *path)
 {
   size_t n = strlen(path) ;
   if (!n) return 1 ;
@@ -176,7 +176,7 @@ static inline int mkdirp (char const *path)
 
 static int makesubdirs (char const *path)
 {
-  if (strrchr(path, '/') && !mkdirp(path))
+  if (strrchr(path, '/') && !mdevd_mkdirp(path))
   {
     if (verbosity) strerr_warnwu2sys("create subdirectories for ", path) ;
     return 0 ;
