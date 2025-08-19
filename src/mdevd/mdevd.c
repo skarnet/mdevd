@@ -686,7 +686,7 @@ static inline int run_scriptelem (struct uevent_s const *event, scriptelem const
     {
       if (!makesubdirs(ud->devname)) return -1 ;
       if (dryrun) strerr_warni4x("dry run: symlink ", node, " to ", ud->devname) ;
-      else if (atomic_symlink(node, ud->devname, "mdevd") < 0)
+      else if (atomic_symlink4(node, ud->devname, 0, 0) < 0)
       {
         if (verbosity) strerr_warnwu4sys("symlink ", node, " to ", ud->devname) ;
         return -1 ;
