@@ -640,7 +640,7 @@ static inline int run_scriptelem (struct uevent_s const *event, scriptelem const
       break ;
     }
   }
-  if (nodelen && ud->action == ACTION_ADD && ud->mmaj >= 0)
+  if (elem->movetype != MOVEINFO_NOCREATE && nodelen && ud->action == ACTION_ADD && ud->mmaj >= 0)
   {
     if (!makesubdirs(node)) return -1 ;
     if (dryrun)
