@@ -3,6 +3,7 @@ Changelog for mdevd.
 In 0.1.8.0
 ----------
 
+ - Bugfixes.
  - New -N option to mdevd, to test a config file.
 
 
