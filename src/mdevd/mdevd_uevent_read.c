@@ -18,9 +18,11 @@
 
 static inline ssize_t fd_recvmsg (int fd, struct msghdr *hdr)
 {
+  int e = errno ;
   ssize_t r ;
   do r = recvmsg(fd, hdr, 0) ;
-  while ((r == -1) && (errno == EINTR)) ;
+  while (r == -1 && errno == EINTR) ;
+  if (r >= 0) errno = e ;
   return r ;
 }
 
