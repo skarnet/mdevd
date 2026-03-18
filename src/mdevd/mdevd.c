@@ -794,7 +794,7 @@ static inline int act_on_event (struct uevent_s const *event, unsigned int actio
       if (ud->devname)
       {
         ud->devname += 9 ;
-        *strchr(ud->devname, '\n') = 0 ;
+        *(char *)strchr(ud->devname, '\n') = 0 ;
       }
     }
     if (!ud->devname) ud->devname = basename(ud->sysdevpath) ;
